@@ -1,0 +1,50 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-papers.css' %}">{% endblock %}
+
+{% block object-tools-items %}
+  {% if final %}
+  <li><a href="{% url 'admin:questionbank_final_print' final.pk %}" target="_blank" rel="noopener">Print question paper</a></li>
+  <li><a href="{% url 'admin:questionbank_final_print' final.pk %}?answers=1" target="_blank" rel="noopener">Print answer key</a></li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
+{% block form_top %}
+{% if final %}
+<section class="wf" aria-label="Final paper">
+  <div class="wf-note wf-note--secure">🔒 <strong>Confidential.</strong> Only the exam controller and super admin can see this paper. Teachers and HODs see only that it's prepared.</div>
+  {% if final.status != "locked" %}
+  <div class="wf-panel wf-panel--secure">
+    <div>
+      <strong>{{ final.questions.count }} questions · {{ final.total_marks }} marks</strong>
+      <p>Review and edit the questions below and save. When you're satisfied, lock the paper; locking can't be undone. Not happy? Regenerate a fresh set from the blueprint.</p>
+    </div>
+    <div class="wf-buttons">
+      <button type="submit" form="wf-form" name="_regenerate" class="wf-btn" data-loading="Regenerating…"
+        onclick="return confirm('Replace all questions with a new AI-generated set? Edits you made will be lost.')">Regenerate</button>
+      <button type="submit" form="wf-form" name="_lock" class="wf-btn wf-btn--primary"
+        onclick="return confirm('Lock this as the final paper? It can no longer be edited or regenerated.')">Lock as final</button>
+    </div>
+  </div>
+  {% else %}
+  <div class="wf-note wf-note--ok">Locked by {{ final.locked_by.get_full_name|default:final.locked_by.username }} on {{ final.locked_at|date:"j M Y, g:i A" }}. Use the print buttons above for the question paper and the answer key.</div>
+  {% endif %}
+</section>
+{% endif %}
+{{ block.super }}
+{% endblock %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+{% if final %}
+<form id="wf-form" method="post" action="">{% csrf_token %}</form>
+<script>
+  document.getElementById('wf-form').addEventListener('submit', function (e) {
+    var btn = e.submitter;
+    if (btn && btn.dataset.loading) { setTimeout(function () { btn.disabled = true; btn.textContent = btn.dataset.loading; }, 0); }
+  });
+</script>
+{% endif %}
+{% endblock %}

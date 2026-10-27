@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-dashboard.css' %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} sts-dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">Home</a></li>
+  <li aria-current="page">Notifications</li>
+</ol>
+{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<div class="dash">
+  <section class="panel" aria-labelledby="nl-title">
+    <header class="panel__head panel__head--row">
+      <div><h2 id="nl-title">Notifications</h2><p>Approvals, deadline reminders and updates.</p></div>
+      <form method="post" action="{% url 'notifications:read_all' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" class="chip chip--ghost" style="border:0;cursor:pointer">Mark all as read</button></form>
+    </header>
+    <ul class="notif-page">
+      {% for n in page %}
+      <li><a class="notif__item notif__item--{{ n.kind }}{% if not n.is_read %} is-unread{% endif %}" href="{% url 'notifications:open' n.pk %}">
+        <span class="notif__icon" aria-hidden="true"></span>
+        <span class="notif__text"><span class="notif__title">{{ n.title }}</span>{% if n.body %}<span class="notif__body">{{ n.body }}</span>{% endif %}<span class="notif__when">{{ n.created_at|date:"j M Y, g:i A" }} · {{ n.get_kind_display }}</span></span>
+      </a></li>
+      {% empty %}
+      <li class="empty">No notifications yet.</li>
+      {% endfor %}
+    </ul>
+    {% if page.has_other_pages %}
+    <nav class="notif-pager" aria-label="Pages">
+      {% if page.has_previous %}<a class="dash-link" href="?page={{ page.previous_page_number }}">← Newer</a>{% endif %}
+      <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+      {% if page.has_next %}<a class="dash-link" href="?page={{ page.next_page_number }}">Older →</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

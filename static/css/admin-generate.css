@@ -49,7 +49,11 @@
 }
 
 .gen-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.gen-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Question type needs the most room ("Long answer / creative"); the count field the least. */
+.gen-grid--4 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr); }
+/* Keep controls in a row on the same line even if a label wraps. */
+.gen-grid { align-items: end; }
+.gen-grid .gen-field label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gen-section > .gen-field { margin-top: 16px; }
 
 .gen-field label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--body-medium-color); }

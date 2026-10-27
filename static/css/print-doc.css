@@ -107,6 +107,23 @@ table.money tfoot td { font-weight: 700; border-top: 1px solid #cbd5e1; border-b
 .letter .closing { margin-top: 56px; }
 .letter .closing .line { width: 220px; margin-top: 48px; border-top: 1px solid #94a3b8; }
 
+/* Exam paper */
+.paper-instructions { margin: 0 0 20px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
+.paper-instructions p { margin: 4px 0 0; }
+.paper-section h2 { margin: 24px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #cbd5e1; font-size: 15px; }
+.paper-questions { margin: 0; padding-left: 22px; }
+.paper-questions > li { margin: 0 0 16px; padding-left: 4px; break-inside: avoid; }
+.paper-q { display: flex; justify-content: space-between; gap: 16px; }
+.paper-marks { flex: none; font-weight: 600; color: #334155; }
+.paper-options { margin: 6px 0 0; padding-left: 22px; }
+.paper-options li { margin: 2px 0; }
+.paper-lines { height: 28px; margin-top: 6px; background: repeating-linear-gradient(transparent 0 27px, #cbd5e1 27px 28px); }
+.paper-lines--long { height: 140px; }
+.paper-lines--short { height: 56px; }
+.paper-answer { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #16a34a; background: #f0fdf4; font-size: 13px; }
+.paper-answer span { color: #334155; }
+.paper-answer small { color: #64748b; }
+
 .watermark-draft { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: #fdf1dc; color: #9a5b00; font-size: 12px; font-weight: 600; }
 
 @media (max-width: 640px) {

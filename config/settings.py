@@ -41,7 +41,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'learning.apps.LearningConfig',
+    'notifications.apps.NotificationsConfig',
     'questionbank.apps.QuestionbankConfig',
     'hr.apps.HrConfig',
 ]
@@ -68,6 +70,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'notifications.context_processors.notifications',
             ],
         },
     },

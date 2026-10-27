@@ -13,6 +13,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/login/", RememberMeLoginView.as_view(), name="login"),
     path("accounts/", include("django.contrib.auth.urls")),
+    path("notifications/", include("notifications.urls")),
 ]
 
 if settings.DEBUG:

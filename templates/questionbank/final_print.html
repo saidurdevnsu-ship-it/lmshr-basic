@@ -1,0 +1,57 @@
+{% load static %}<!doctype html>
+<html lang="{% if bp.language == 'bn' %}bn{% else %}en{% endif %}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% if answers %}Answer key{% else %}Question paper{% endif %} · {{ bp.title }}</title>
+  <link rel="stylesheet" href="{% static 'css/print-doc.css' %}">
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    <a href="{% url 'admin:questionbank_finalpaper_change' paper.pk %}">Back</a>
+  </div>
+
+  <main class="sheet">
+    {% if paper.status != "locked" %}<p class="watermark-draft">NOT LOCKED. This paper can still change.</p>{% endif %}
+    <header class="letterhead">
+      <div class="letterhead__brand">
+        <span class="letterhead__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+        <div><h1>{{ company_name }}</h1><p>{% if bp.exam %}{{ bp.exam.title }}{% else %}Examination{% endif %}</p></div>
+      </div>
+      <div class="doc-title"><strong>{% if answers %}Answer key · confidential{% else %}{{ bp.title }}{% endif %}</strong><p>{{ bp.subject }} · {{ bp.grade }}</p></div>
+    </header>
+
+    <dl class="meta">
+      <div><dt>Time allowed</dt><dd>{{ bp.duration_minutes }} minutes</dd></div>
+      <div><dt>Total marks</dt><dd>{{ total_marks }}</dd></div>
+    </dl>
+
+    {% if not answers and bp.instructions %}
+    <section class="paper-instructions"><strong>Instructions</strong><p>{{ bp.instructions|linebreaksbr }}</p></section>
+    {% endif %}
+
+    {% for section in sections %}
+    <section class="paper-section">
+      {% if section.name %}<h2>{{ section.name }}</h2>{% endif %}
+      <ol class="paper-questions">
+        {% for q in section.questions %}
+        <li value="{{ q.order }}">
+          <div class="paper-q"><span>{{ q.text|linebreaksbr }}</span><span class="paper-marks">[{{ q.marks }}]</span></div>
+          {% if q.options %}
+          <ol class="paper-options" type="A">{% for o in q.options %}<li>{{ o }}</li>{% endfor %}</ol>
+          {% elif not answers and q.question_type != "true_false" %}
+          <div class="paper-lines paper-lines--{{ q.question_type }}"></div>
+          {% endif %}
+          {% if answers %}
+          <div class="paper-answer"><strong>Answer:</strong> {{ q.answer|linebreaksbr }}{% if q.explanation %}<br><span>{{ q.explanation|linebreaksbr }}</span>{% endif %}{% if q.source_reference %}<br><small>Source: {{ q.source_reference }}</small>{% endif %}</div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endfor %}
+  </main>
+</body>
+</html>

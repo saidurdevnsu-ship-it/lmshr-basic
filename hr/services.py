@@ -7,7 +7,11 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Sum
+from django.urls import reverse
 from django.utils import timezone
+
+from notifications.models import Notification
+from notifications.services import notify, users_with_perm
 
 from .models import Attendance, Employee, Holiday, LeaveRequest, LeaveType, NOCRequest, Payslip, ReviewStatus
 
@@ -91,6 +95,19 @@ def review_leave(leave, *, approve, reviewer, note=""):
                 employee=leave.employee, date=day,
                 defaults={"status": Attendance.Status.ON_LEAVE, "note": f"{leave.leave_type} leave"},
             )
+    notify(
+        leave.employee.user,
+        f"Leave {'approved' if approve else 'rejected'}: {leave.leave_type}, {leave.start_date:%d %b} – {leave.end_date:%d %b}",
+        body=leave.review_note, url=reverse("admin:hr_leaverequest_change", args=[leave.pk]),
+        kind=Notification.Kind.SUCCESS if approve else Notification.Kind.WARNING, exclude=reviewer,
+    )
+
+
+def announce_request(obj, what, summary):
+    """Tell HR managers a leave or NOC request is waiting."""
+    notify(users_with_perm("hr.manage_hr"), f"{what} request from {obj.employee.full_name}", body=summary,
+           url=reverse(f"admin:hr_{obj._meta.model_name}_change", args=[obj.pk]),
+           kind=Notification.Kind.APPROVAL, exclude=obj.employee.user)
 
 
 # ---------- NOC ----------
@@ -107,6 +124,13 @@ def review_noc(noc, *, approve, reviewer, note=""):
         count = NOCRequest.objects.filter(reference_no__contains=f"/NOC/{year}/").count() + 1
         noc.reference_no = f"{settings.HR_REFERENCE_PREFIX}/NOC/{year}/{count:04d}"
     noc.save()
+    notify(
+        noc.employee.user,
+        f"NOC {'approved' if approve else 'rejected'}: {noc.get_purpose_display()}",
+        body="Your letter is ready to print." if approve else noc.review_note,
+        url=reverse("admin:hr_nocrequest_changelist"),
+        kind=Notification.Kind.SUCCESS if approve else Notification.Kind.WARNING, exclude=reviewer,
+    )
 
 
 # ---------- Attendance ----------

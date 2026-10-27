@@ -16,7 +16,7 @@ class GenerateQuestionsForm(forms.Form):
     )
     question_type = forms.ChoiceField(choices=Question.QuestionType.choices, initial=Question.QuestionType.MCQ)
     difficulty = forms.ChoiceField(choices=Question.Difficulty.choices, initial=Question.Difficulty.MEDIUM)
-    count = forms.IntegerField(label="Number of questions", min_value=1, max_value=30, initial=10)
+    count = forms.IntegerField(label="How many", min_value=1, max_value=30, initial=10)
     language = forms.ChoiceField(choices=LANGUAGES.items(), initial="en")
 
     def clean(self):

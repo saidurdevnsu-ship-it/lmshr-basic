@@ -138,6 +138,7 @@ html[data-theme="dark"] .dash-hero__eyebrow { color: #93b4ff; }
   text-transform: none;
 }
 .panel__head p { margin-top: 2px; font-size: 13px; color: var(--body-quiet-color); }
+.panel-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .empty { padding: 24px 20px; color: var(--body-quiet-color); font-size: 13px; }
 .empty .dash-link { display: inline-block; margin-top: 8px; }

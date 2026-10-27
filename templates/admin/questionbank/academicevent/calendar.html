@@ -1,0 +1,70 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-papers.css' %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-questionbank model-academicevent sts-calendar{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">Home</a></li>
+  <li><a href="{% url 'admin:questionbank_academicevent_changelist' %}">Academic calendar</a></li>
+  <li aria-current="page">{{ month|date:"F Y" }}</li>
+</ol>
+{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<div class="cal-wrap">
+  <div class="cal-main">
+    <header class="cal-head">
+      <div>
+        <h1>{{ month|date:"F Y" }}</h1>
+        <p>Cambridge exam series, terms, internal exams and question deadlines.</p>
+      </div>
+      <nav class="cal-nav" aria-label="Month">
+        <a class="wf-btn" href="?year={{ prev_month.year }}&month={{ prev_month.month }}" aria-label="Previous month">‹</a>
+        <a class="wf-btn" href="?year={{ today.year }}&month={{ today.month }}">Today</a>
+        <a class="wf-btn" href="?year={{ next_month.year }}&month={{ next_month.month }}" aria-label="Next month">›</a>
+        {% if can_add %}<a class="wf-btn wf-btn--primary" href="{% url 'admin:questionbank_academicevent_add' %}">Add event</a>{% endif %}
+      </nav>
+    </header>
+
+    <div class="cal-grid" role="grid" aria-label="{{ month|date:'F Y' }}">
+      <div class="cal-dow" role="columnheader">Sun</div><div class="cal-dow" role="columnheader">Mon</div><div class="cal-dow" role="columnheader">Tue</div><div class="cal-dow" role="columnheader">Wed</div><div class="cal-dow" role="columnheader">Thu</div><div class="cal-dow" role="columnheader">Fri</div><div class="cal-dow" role="columnheader">Sat</div>
+      {% for week in weeks %}{% for day in week %}
+      <div class="cal-day{% if not day.in_month %} is-out{% endif %}{% if day.date == today %} is-today{% endif %}" role="gridcell">
+        <span class="cal-num">{{ day.date.day }}</span>
+        {% for item in day.events|slice:":3" %}
+        <a class="cal-ev cal-ev--{{ item.color }}{% if not item.is_start %} is-cont{% endif %}" href="{% url 'admin:questionbank_academicevent_change' item.event.pk %}" title="{{ item.event.title }} · {{ item.event.get_event_type_display }}">{{ item.event.title }}</a>
+        {% endfor %}
+        {% if day.events|length > 3 %}<span class="cal-more">+{{ day.events|length|add:"-3" }} more</span>{% endif %}
+      </div>
+      {% endfor %}{% endfor %}
+    </div>
+
+    <ul class="cal-legend" aria-label="Legend">
+      {% for label, color in legend %}<li><span class="cal-swatch cal-ev--{{ color }}"></span>{{ label }}</li>{% endfor %}
+    </ul>
+  </div>
+
+  <aside class="cal-side">
+    <div class="gen-tip">
+      <h2>Coming up</h2>
+      {% if upcoming %}
+      <ul class="cal-upcoming">
+        {% for e in upcoming %}
+        <li>
+          <a href="{% url 'admin:questionbank_academicevent_change' e.pk %}">{{ e.title }}</a>
+          <small>{{ e.start_date|date:"D j M Y" }}{% if e.end_date and e.end_date != e.start_date %} – {{ e.end_date|date:"j M" }}{% endif %} · {{ e.get_event_type_display }}{% if e.qualification %} · {{ e.get_qualification_display }}{% endif %}</small>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="cal-empty">Nothing scheduled yet. Add the Cambridge exam series dates from the official Cambridge International timetable, plus your terms and internal exams.</p>
+      {% endif %}
+    </div>
+  </aside>
+</div>
+{% endblock %}

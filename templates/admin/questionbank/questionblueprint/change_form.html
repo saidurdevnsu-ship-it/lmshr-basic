@@ -1,0 +1,89 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-papers.css' %}">{% endblock %}
+
+{% block form_top %}
+{% if bp %}
+<section class="wf" aria-label="Blueprint workflow">
+  <ol class="wf-steps">
+    {% with s=bp.status %}
+    <li class="wf-step {% if s == 'draft' or s == 'returned' %}is-current{% else %}is-done{% endif %}">
+      <span class="wf-dot">1</span><div><strong>Blueprint</strong><small>{{ bp.assigned_to.get_full_name|default:bp.assigned_to.username }}</small></div>
+    </li>
+    <li class="wf-step {% if s == 'in_review' %}is-current{% elif s == 'approved' or s == 'finalized' %}is-done{% endif %}">
+      <span class="wf-dot">2</span><div><strong>HOD review</strong><small>{% if bp.reviewed_by and s != 'in_review' %}{{ bp.reviewed_by.get_full_name|default:bp.reviewed_by.username }}{% else %}Approve or return{% endif %}</small></div>
+    </li>
+    <li class="wf-step {% if s == 'approved' %}is-current{% elif s == 'finalized' %}is-done{% endif %}">
+      <span class="wf-dot">3</span><div><strong>Final paper</strong><small>Exam controller + AI · confidential</small></div>
+    </li>
+    {% endwith %}
+  </ol>
+
+  {% if bp.status == "returned" and bp.review_note %}
+  <div class="wf-note wf-note--warn"><strong>HOD asked for changes:</strong> {{ bp.review_note|linebreaksbr }}</div>
+  {% endif %}
+
+  {% if can_submit %}
+  <div class="wf-panel">
+    <div>
+      <strong>{{ bp.total_questions }} question{{ bp.total_questions|pluralize }} · {{ bp.total_marks }} mark{{ bp.total_marks|pluralize }} in {{ bp.items.count }} section{{ bp.items.count|pluralize }}</strong>
+      <p>Add each section below with a sample question showing the style you want, and attach a sample paper if you have one. Then submit it for HOD review.</p>
+    </div>
+    <button type="submit" form="wf-form" name="_submit_review" class="wf-btn wf-btn--primary">Submit for HOD review</button>
+  </div>
+  {% endif %}
+
+  {% if can_review_now %}
+  <div class="wf-panel wf-panel--review">
+    <div class="wf-review">
+      <label for="wf-note"><strong>Your comments</strong> <span class="wf-muted">(required when returning)</span></label>
+      <textarea id="wf-note" name="review_note" form="wf-form" rows="2" placeholder="e.g. Section B needs two more application questions from Chapter 5."></textarea>
+    </div>
+    <div class="wf-buttons">
+      <button type="submit" form="wf-form" name="_return" class="wf-btn">Return to teacher</button>
+      <button type="submit" form="wf-form" name="_approve" class="wf-btn wf-btn--primary">Approve &amp; send to exam controller</button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if is_controller %}
+    {% if final %}
+    <div class="wf-panel wf-panel--secure">
+      <div>
+        <strong>🔒 Final paper {% if final.status == "locked" %}locked{% else %}generated{% endif %}</strong>
+        <p>{{ final.questions.count }} questions · generated {{ final.generated_at|date:"j M Y, g:i A" }}. Only the exam controller and super admin can open it.</p>
+      </div>
+      <a class="wf-btn wf-btn--primary" href="{% url 'admin:questionbank_finalpaper_change' final.pk %}">Open final paper</a>
+    </div>
+    {% elif can_generate %}
+    <div class="wf-panel wf-panel--secure">
+      <div>
+        <strong>Ready for the final paper</strong>
+        <p>Claude writes new questions that follow this blueprint, grounded in the {{ bp.subject }} / {{ bp.grade }} books. Teachers and the HOD won't see them. This takes 1–3 minutes.</p>
+      </div>
+      <button type="submit" form="wf-form" name="_generate_final" class="wf-btn wf-btn--primary" data-loading="Generating…">Generate final paper with AI</button>
+    </div>
+    {% endif %}
+  {% elif bp.status == "approved" %}
+  <div class="wf-note">Approved. The exam controller will prepare the final paper. Its questions are confidential, so you won't see them.</div>
+  {% elif bp.status == "finalized" %}
+  <div class="wf-note wf-note--ok">The final paper has been prepared and locked by the exam controller. Its questions are confidential.</div>
+  {% endif %}
+</section>
+{% endif %}
+{{ block.super }}
+{% endblock %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+{% if bp %}
+<form id="wf-form" method="post" action="">{% csrf_token %}</form>
+<script>
+  document.getElementById('wf-form').addEventListener('submit', function (e) {
+    var btn = e.submitter;
+    if (btn && btn.dataset.loading) { setTimeout(function () { btn.disabled = true; btn.textContent = btn.dataset.loading; }, 0); }
+  });
+</script>
+{% endif %}
+{% endblock %}

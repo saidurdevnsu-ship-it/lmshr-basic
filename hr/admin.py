@@ -9,6 +9,9 @@ from django.utils.html import format_html
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from notifications.models import Notification
+from notifications.services import notify
+
 from . import services
 from .forms import GeneratePayslipsForm, LeaveRequestForm, MarkAttendanceDateForm, active_employees
 from .models import (
@@ -255,6 +258,8 @@ class LeaveRequestAdmin(OwnRecordsMixin, admin.ModelAdmin):
             obj.employee = own_employee(request)
         obj.days = len(services.working_days(obj.start_date, obj.end_date))
         super().save_model(request, obj, form, change)
+        if not change:
+            services.announce_request(obj, "Leave", f"{obj.leave_type} · {obj.start_date:%d %b} – {obj.end_date:%d %b} · {obj.days:g} day(s)")
 
     def get_actions(self, request):
         actions = super().get_actions(request)
@@ -346,6 +351,8 @@ class NOCRequestAdmin(OwnRecordsMixin, admin.ModelAdmin):
         if not change and not is_hr_manager(request.user):
             obj.employee = own_employee(request)
         super().save_model(request, obj, form, change)
+        if not change:
+            services.announce_request(obj, "NOC", obj.get_purpose_display())
 
     def get_actions(self, request):
         actions = super().get_actions(request)
@@ -468,7 +475,12 @@ class PayslipAdmin(OwnRecordsMixin, admin.ModelAdmin):
 
     @admin.action(description="Finalize selected (employees can then see them)")
     def finalize_selected(self, request, queryset):
-        n = queryset.filter(status=Payslip.Status.DRAFT).update(status=Payslip.Status.FINAL)
+        drafts = list(queryset.filter(status=Payslip.Status.DRAFT).select_related("employee__user"))
+        n = Payslip.objects.filter(pk__in=[s.pk for s in drafts]).update(status=Payslip.Status.FINAL)
+        for slip in drafts:
+            notify(slip.employee.user, f"Your pay slip for {slip.period_label} is ready",
+                   body=f"Net pay {settings.HR_CURRENCY} {slip.net_pay:,.2f}",
+                   url=reverse("admin:hr_payslip_print", args=[slip.pk]), kind=Notification.Kind.SUCCESS)
         self.message_user(request, f"Finalized {n} pay slip(s).", messages.SUCCESS if n else messages.WARNING)
 
     def get_urls(self):

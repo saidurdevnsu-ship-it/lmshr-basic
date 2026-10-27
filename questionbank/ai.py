@@ -115,6 +115,32 @@ def generate_questions(*, subject, grade, topic, question_type, difficulty, coun
         difficulty=difficulty, count=count, language=language,
     )
 
+    items = _ask_claude(SYSTEM_PROMPT, messages, OUTPUT_SCHEMA)["questions"]
+
+    questions = [
+        Question(
+            subject=subject,
+            grade=grade,
+            topic=topic,
+            question_type=question_type,
+            difficulty=difficulty,
+            text=item["text"].strip(),
+            options=[o.strip() for o in item["options"]] if question_type == Question.QuestionType.MCQ else [],
+            answer=item["answer"].strip(),
+            explanation=item["explanation"].strip(),
+            source_reference=item["source_reference"].strip()[:255],
+            status=Question.Status.DRAFT,
+            ai_generated=True,
+            created_by=user,
+        )
+        for item in items
+        if item.get("text", "").strip()
+    ]
+    return Question.objects.bulk_create(questions)
+
+
+def _ask_claude(system, messages, schema, *, effort="medium"):
+    """Send one structured-output request to Claude and return the parsed JSON object."""
     try:
         client = anthropic.Anthropic()
         with client.beta.messages.stream(
@@ -122,10 +148,10 @@ def generate_questions(*, subject, grade, topic, question_type, difficulty, coun
             max_tokens=64000,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
-            system=SYSTEM_PROMPT,
+            system=system,
             output_config={
-                "effort": "medium",
-                "format": {"type": "json_schema", "schema": OUTPUT_SCHEMA},
+                "effort": effort,
+                "format": {"type": "json_schema", "schema": schema},
             },
             messages=messages,
         ) as stream:
@@ -161,28 +187,131 @@ def generate_questions(*, subject, grade, topic, question_type, difficulty, coun
 
     text = "".join(block.text for block in response.content if block.type == "text")
     try:
-        items = json.loads(text)["questions"]
+        data = json.loads(text)
+        data["questions"]
     except (ValueError, KeyError, TypeError):
         logger.warning("Unparseable question output (request %s): %r", response._request_id, text[:500])
         raise GenerationError("Claude's reply couldn't be read. Please try again.")
+    return data
 
-    questions = [
-        Question(
-            subject=subject,
-            grade=grade,
-            topic=topic,
-            question_type=question_type,
-            difficulty=difficulty,
-            text=item["text"].strip(),
-            options=[o.strip() for o in item["options"]] if question_type == Question.QuestionType.MCQ else [],
-            answer=item["answer"].strip(),
-            explanation=item["explanation"].strip(),
-            source_reference=item["source_reference"].strip()[:255],
-            status=Question.Status.DRAFT,
-            ai_generated=True,
-            created_by=user,
-        )
-        for item in items
-        if item.get("text", "").strip()
+
+# ---------- Confidential final paper from a blueprint ----------
+
+FINAL_SYSTEM_PROMPT = """\
+You are the chief examiner setting a confidential school exam paper. You are given the subject's textbooks, \
+an exam blueprint written by a subject teacher (sections, question types, difficulty, topics, marks and sample \
+questions), and possibly a sample paper.
+
+Write a brand-new paper that follows the blueprint exactly: the same sections, the requested number of \
+questions of each type, difficulty and marks. Use the sample questions and sample paper only as a guide to \
+style, format and level. Never copy or lightly reword a sample question; the teacher who wrote the blueprint \
+must not be able to predict the final questions.
+
+Ground every question in the textbooks provided and match the grade level. Each question must have one \
+unambiguous correct answer (for long/creative questions give a model answer or marking points). For \
+multiple-choice questions give exactly four options and make "answer" the exact text of the correct option; \
+for true/false, "answer" is "True" or "False"; for other types "options" is an empty list. In \
+"source_reference" name the chapter, section or page the question is based on.
+"""
+
+FINAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "section": {"type": "string"},
+                    "question_type": {"type": "string", "enum": [c for c, _ in Question.QuestionType.choices]},
+                    "text": {"type": "string"},
+                    "options": {"type": "array", "items": {"type": "string"}},
+                    "answer": {"type": "string"},
+                    "explanation": {"type": "string"},
+                    "marks": {"type": "integer"},
+                    "source_reference": {"type": "string"},
+                },
+                "required": ["section", "question_type", "text", "options", "answer", "explanation", "marks",
+                             "source_reference"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["questions"],
+    "additionalProperties": False,
+}
+
+
+def _blueprint_text(bp, items):
+    lines = [
+        f"Exam: {bp.title}",
+        f"Subject: {bp.subject} · Grade: {bp.grade}" + (f" · Exam: {bp.exam}" if bp.exam else ""),
+        f"Duration: {bp.duration_minutes} minutes · Total marks: {sum(i.count * i.marks_each for i in items)}",
+        f"Language: write everything in {LANGUAGES[bp.language]}.",
+        "",
+        "Blueprint sections:",
     ]
-    return Question.objects.bulk_create(questions)
+    for n, item in enumerate(items, 1):
+        lines.append(
+            f"{n}. {item.section or f'Section {n}'}: {item.count} × {item.get_question_type_display()} "
+            f"(question_type \"{item.question_type}\"), {item.get_difficulty_display().lower()}, "
+            f"{item.marks_each} mark(s) each" + (f", topic: {item.topic}" if item.topic else "")
+        )
+        if item.sample_question.strip():
+            lines.append(f"   Sample (style only, do not reuse): {item.sample_question.strip()}")
+    if bp.guidance.strip():
+        lines += ["", f"Additional guidance from the department: {bp.guidance.strip()}"]
+    lines += ["", f"Write exactly {sum(i.count for i in items)} questions, in blueprint order."]
+    return "\n".join(lines)
+
+
+def generate_final_paper(blueprint, user):
+    """Write (or rewrite) the confidential final paper for an approved blueprint. Returns the FinalPaper."""
+    from django.db import transaction
+    from django.utils import timezone
+
+    from .models import FinalPaper, FinalQuestion
+
+    items = list(blueprint.items.all())
+    if not items:
+        raise GenerationError("This blueprint has no sections yet.")
+    sources = list(KnowledgeSource.objects.filter(subject=blueprint.subject, grade=blueprint.grade, is_active=True))
+    if not sources:
+        raise GenerationError(
+            f"No active books are uploaded for {blueprint.subject} / {blueprint.grade}. "
+            "Upload one under Books & knowledge sources so the paper is grounded in the syllabus."
+        )
+    total = sum(s.file.size for s in sources) + (blueprint.sample_file.size if blueprint.sample_file else 0)
+    if total > MAX_TOTAL_SOURCE_BYTES:
+        raise GenerationError("The books and sample paper are too large to send together. Upload chapters instead.")
+
+    documents = [_source_block(s) for s in sources]
+    documents[-1]["cache_control"] = {"type": "ephemeral"}
+    if blueprint.sample_file:
+        sample = KnowledgeSource(title="Sample paper (style reference only)", file=blueprint.sample_file)
+        documents.append(_source_block(sample))
+    messages = [{"role": "user", "content": [*documents, {"type": "text", "text": _blueprint_text(blueprint, items)}]}]
+
+    data = _ask_claude(FINAL_SYSTEM_PROMPT, messages, FINAL_SCHEMA, effort="high")
+    questions = [q for q in data["questions"] if q.get("text", "").strip()]
+    if not questions:
+        raise GenerationError("Claude didn't return any questions. Please try again.")
+
+    with transaction.atomic():
+        paper, _ = FinalPaper.objects.select_for_update().get_or_create(blueprint=blueprint)
+        if paper.status == FinalPaper.Status.LOCKED:
+            raise GenerationError("This final paper is locked and can't be regenerated.")
+        paper.questions.all().delete()
+        FinalQuestion.objects.bulk_create([
+            FinalQuestion(
+                paper=paper, order=n, section=q["section"].strip()[:50], question_type=q["question_type"],
+                text=q["text"].strip(), answer=q["answer"].strip(), explanation=q["explanation"].strip(),
+                options=[o.strip() for o in q["options"]] if q["question_type"] == Question.QuestionType.MCQ else [],
+                marks=max(int(q["marks"]), 0), source_reference=q["source_reference"].strip()[:255],
+            )
+            for n, q in enumerate(questions, 1)
+        ])
+        paper.model_used = settings.QUESTION_GENERATION_MODEL
+        paper.generated_by, paper.generated_at = user, timezone.now()
+        paper.save()
+    return paper
