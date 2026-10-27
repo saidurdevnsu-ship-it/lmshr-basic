@@ -1,0 +1,33 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+<link rel="preload" href="{% static 'fonts/inter-latin-wght-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{% static 'css/admin-theme.css' %}">
+{% endblock %}
+
+{% block branding %}
+<a class="sts-brand" href="{% url 'admin:index' %}">
+  <span class="sts-brand__mark" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+  </span>
+  <span class="sts-brand__text">
+    <span id="site-name">{{ site_header|default:_('Django administration') }}</span>
+    <span class="sts-brand__tag">STS Pulse · People &amp; Learning Hub</span>
+  </span>
+</a>
+{% if user.is_anonymous %}
+  {% include "admin/color_theme_toggle.html" %}
+{% endif %}
+{% endblock %}
+
+{% block welcome-msg %}
+<span class="sts-user">
+  <span class="sts-user__avatar" aria-hidden="true">{% firstof user.get_short_name user.get_username as display_name %}{{ display_name|slice:":1"|upper }}</span>
+  <span class="sts-user__name">{{ display_name }}</span>
+</span>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

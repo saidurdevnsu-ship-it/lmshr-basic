@@ -1,28 +1,217 @@
-<!doctype html>
+{% load static %}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in</title>
-  <style>
-    body { font: 16px system-ui, sans-serif; max-width: 28rem; margin: 10vh auto; padding: 0 1rem; color: #172033; }
-    form { display: grid; gap: .75rem; }
-    input { font: inherit; padding: .65rem; border: 1px solid #aab3c2; border-radius: .4rem; }
-    button { font: inherit; padding: .7rem; border: 0; border-radius: .4rem; color: white; background: #2457c5; cursor: pointer; }
-    .error { color: #a11; }
-  </style>
+  <title>Sign in · STS Pulse</title>
+  <meta name="description" content="Sign in to STS Pulse, the People & Learning Hub.">
+  <link rel="preload" href="{% static 'fonts/inter-latin-wght-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'css/login.css' %}">
 </head>
 <body>
-  <h1>STS LMS & HR portal Sign in</h1>
-  {% if form.errors %}<p class="error">Username or password is incorrect. Please try again.</p>{% endif %}
-  <form method="post">
-    {% csrf_token %}
-    <input type="hidden" name="next" value="{{ next }}">
-    <label for="id_username">Username</label>
-    {{ form.username }}
-    <label for="id_password">Password</label>
-    {{ form.password }}
-    <button type="submit">Sign in</button>
-  </form>
+  <div class="page">
+
+    <!-- Branding panel (desktop) -->
+    <aside class="brand-panel" aria-label="About STS Pulse">
+      <svg class="brand-panel__art" aria-hidden="true" preserveAspectRatio="xMidYMid slice" viewBox="0 0 800 800">
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M40 0H0V40" fill="none" stroke="white" stroke-opacity="0.05" stroke-width="1"/>
+          </pattern>
+          <linearGradient id="fade" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="white" stop-opacity="0.18"/>
+            <stop offset="1" stop-color="white" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="800" fill="url(#grid)"/>
+        <circle cx="680" cy="120" r="220" fill="none" stroke="url(#fade)" stroke-width="1.5"/>
+        <circle cx="680" cy="120" r="150" fill="none" stroke="url(#fade)" stroke-width="1.5"/>
+        <circle cx="680" cy="120" r="80" fill="url(#fade)" fill-opacity="0.3"/>
+        <polygon points="60,700 260,560 360,780" fill="url(#fade)" fill-opacity="0.5"/>
+        <rect x="420" y="520" width="180" height="180" rx="24" transform="rotate(18 510 610)" fill="none" stroke="url(#fade)" stroke-width="1.5"/>
+      </svg>
+
+      <div class="brand-panel__section">
+        <div class="logo">
+          <span class="logo__mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+          </span>
+          <span class="logo__name">STS Pulse</span>
+        </div>
+      </div>
+
+      <div class="brand-panel__body">
+        <span class="pill">People &amp; Learning Hub</span>
+        <h1>Your people and their growth, in one place.</h1>
+        <p class="brand-panel__lead">Courses, staff records and progress reports, in one secure workspace for your team.</p>
+        <ul class="features">
+          <li>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
+            <span>Learning paths, course enrolment and completion tracking</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
+            <span>Employee records, roles and HR workflows</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
+            <span>Reports and dashboards for team leads</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="brand-panel__section brand-panel__footer">
+        &copy; {% now "Y" %} STS. Internal use only.
+      </div>
+    </aside>
+
+    <!-- Sign-in panel -->
+    <main class="signin">
+      <div class="signin__inner">
+
+        <div class="mobile-logo">
+          <span class="logo__mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+          </span>
+          <div>
+            <p class="mobile-logo__name">STS Pulse</p>
+            <p class="mobile-logo__tag">People &amp; Learning Hub</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Sign in</h2>
+          <p class="card__sub">Welcome back. Enter your details to continue.</p>
+
+          {% if form.errors %}
+          <div class="alert alert--error" role="alert" aria-live="assertive" id="form-error">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 0-1 1v4a1 1 0 1 0 2 0V6a1 1 0 0 0-1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+            <div>
+              {% if form.non_field_errors %}
+                {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+              {% else %}
+                <p>Please fix the highlighted fields below.</p>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if next and user.is_authenticated %}
+          <div class="alert alert--warning" role="status">
+            Your account doesn't have access to that page. Sign in with a different account to continue.
+          </div>
+          {% endif %}
+
+          <form method="post" action="{% url 'login' %}" class="form" novalidate {% if form.errors %}aria-describedby="form-error"{% endif %}>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <div class="field">
+              <label for="id_username" class="label">Username</label>
+              <input class="input" id="id_username" name="username" type="text"
+                value="{{ form.username.value|default_if_none:'' }}"
+                autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus
+                placeholder="e.g. jdoe"
+                {% if form.username.errors %}aria-invalid="true" aria-describedby="username-error"{% endif %}>
+              {% for error in form.username.errors %}
+              <p id="username-error" class="field-error">{{ error }}</p>
+              {% endfor %}
+            </div>
+
+            <div class="field">
+              <div class="label-row">
+                <label for="id_password" class="label">Password</label>
+                <a href="{% url 'password_reset' %}" class="link">Forgot password?</a>
+              </div>
+              <div class="input-wrap">
+                <input class="input" id="id_password" name="password" type="password"
+                  autocomplete="current-password" required placeholder="••••••••"
+                  {% if form.password.errors %}aria-invalid="true" aria-describedby="password-error"{% endif %}>
+                <button type="button" id="toggle-password" class="toggle"
+                  aria-controls="id_password" aria-pressed="false" aria-label="Show password">
+                  <svg data-icon="show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <svg data-icon="hide" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.9 9.9 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>
+                  </svg>
+                </button>
+              </div>
+              {% for error in form.password.errors %}
+              <p id="password-error" class="field-error">{{ error }}</p>
+              {% endfor %}
+              <p id="caps-warning" class="field-hint hidden" role="status">Caps Lock is on.</p>
+            </div>
+
+            <div class="check">
+              <input id="remember_me" name="remember_me" type="checkbox" value="1" checked>
+              <label for="remember_me">Keep me signed in</label>
+            </div>
+
+            <button type="submit" id="submit-btn" class="btn btn--primary">
+              <svg id="submit-spinner" class="spinner hidden" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"/>
+                <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+              <span id="submit-label">Sign in</span>
+            </button>
+          </form>
+
+          {% if sso_login_url %}
+          <div class="divider" aria-hidden="true"><span>or</span></div>
+          <a href="{{ sso_login_url }}" class="btn btn--secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Sign in with Corporate SSO
+          </a>
+          {% endif %}
+        </div>
+
+        <p class="help">Trouble signing in? Contact your HR or IT administrator.</p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var input = document.getElementById('id_password');
+      var toggle = document.getElementById('toggle-password');
+      var showIcon = toggle.querySelector('[data-icon="show"]');
+      var hideIcon = toggle.querySelector('[data-icon="hide"]');
+
+      toggle.addEventListener('click', function () {
+        var reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+        toggle.setAttribute('aria-pressed', String(reveal));
+        toggle.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+        showIcon.classList.toggle('hidden', reveal);
+        hideIcon.classList.toggle('hidden', !reveal);
+        input.focus();
+      });
+
+      var caps = document.getElementById('caps-warning');
+      function checkCaps(e) {
+        if (e.getModifierState) caps.classList.toggle('hidden', !e.getModifierState('CapsLock'));
+      }
+      input.addEventListener('keydown', checkCaps);
+      input.addEventListener('keyup', checkCaps);
+      input.addEventListener('blur', function () { caps.classList.add('hidden'); });
+
+      var form = toggle.closest('form');
+      var btn = document.getElementById('submit-btn');
+      form.addEventListener('submit', function () {
+        input.type = 'password';
+        btn.disabled = true;
+        document.getElementById('submit-spinner').classList.remove('hidden');
+        document.getElementById('submit-label').textContent = 'Signing in…';
+      });
+
+      {% if form.errors %}
+      var firstInvalid = form.querySelector('[aria-invalid="true"]') || input;
+      firstInvalid.focus();
+      {% endif %}
+    })();
+  </script>
 </body>
 </html>

@@ -1,0 +1,393 @@
+/* STS Pulse theme for Django admin — applies to every admin page. */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-latin-wght-normal.woff2") format("woff2");
+}
+
+/* ---------- Tokens (light) ---------- */
+:root,
+html[data-theme="light"] {
+  --sts-brand-50: #eef4ff;
+  --sts-brand-100: #dbe6fe;
+  --sts-brand-500: #3f6ff2;
+  --sts-brand-600: #2a55e0;
+  --sts-brand-700: #2243c4;
+  --sts-brand-900: #1d337d;
+  --sts-brand-950: #141f4b;
+
+  --sts-surface: #ffffff;
+  --sts-canvas: #f6f7fb;
+  --sts-muted: #64748b;
+  --sts-ring: rgb(63 111 242 / 0.35);
+  --sts-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --sts-radius: 12px;
+
+  --primary: var(--sts-brand-600);
+  --secondary: var(--sts-brand-700);
+  --accent: var(--sts-brand-500);
+  --primary-fg: #fff;
+
+  --body-fg: #1e293b;
+  --body-bg: var(--sts-canvas);
+  --body-quiet-color: #64748b;
+  --body-medium-color: #334155;
+  --body-loud-color: #0f172a;
+
+  --header-color: #475569;
+  --header-branding-color: #0f172a;
+  --header-bg: var(--sts-surface);
+  --header-link-color: #334155;
+
+  --breadcrumbs-fg: #64748b;
+  --breadcrumbs-link-fg: var(--sts-brand-600);
+  --breadcrumbs-bg: var(--sts-surface);
+
+  --link-fg: var(--sts-brand-600);
+  --link-hover-color: var(--sts-brand-900);
+  --link-selected-fg: var(--sts-brand-700);
+
+  --hairline-color: #e8ecf3;
+  --border-color: #d6dce6;
+
+  --error-fg: #dc2626;
+  --message-success-bg: #ecfdf5;
+  --message-warning-bg: #fffbeb;
+  --message-error-bg: #fef2f2;
+  --message-info-bg: var(--sts-brand-50);
+
+  --darkened-bg: #f1f4f9;
+  --selected-bg: #e6edfb;
+  --selected-row: #eef4ff;
+
+  --button-fg: #fff;
+  --button-bg: var(--sts-brand-600);
+  --button-hover-bg: var(--sts-brand-700);
+  --default-button-bg: var(--sts-brand-700);
+  --default-button-hover-bg: var(--sts-brand-900);
+  --close-button-bg: #64748b;
+  --close-button-hover-bg: #334155;
+  --delete-button-bg: #dc2626;
+  --delete-button-hover-bg: #b91c1c;
+
+  --object-tools-fg: #fff;
+  --object-tools-bg: var(--sts-brand-600);
+  --object-tools-hover-bg: var(--sts-brand-700);
+
+  --font-family-primary: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ---------- Tokens (dark) ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sts-surface: #111827;
+    --sts-canvas: #0b1120;
+    --sts-muted: #94a3b8;
+    --sts-shadow: 0 0 0 1px rgb(255 255 255 / 0.04);
+
+    --primary: var(--sts-brand-500);
+    --secondary: var(--sts-brand-600);
+    --body-fg: #e2e8f0;
+    --body-quiet-color: #94a3b8;
+    --body-medium-color: #cbd5e1;
+    --body-loud-color: #f8fafc;
+    --header-color: #cbd5e1;
+    --header-branding-color: #f8fafc;
+    --header-link-color: #cbd5e1;
+    --breadcrumbs-fg: #94a3b8;
+    --breadcrumbs-link-fg: #93b4ff;
+    --link-fg: #93b4ff;
+    --link-hover-color: #c7d7ff;
+    --link-selected-fg: #93b4ff;
+    --hairline-color: #1f2937;
+    --border-color: #334155;
+    --message-success-bg: #052e1f;
+    --message-warning-bg: #2d2205;
+    --message-error-bg: #3a0d0d;
+    --message-info-bg: #111c3d;
+    --darkened-bg: #1a2233;
+    --selected-bg: #1c2a4a;
+    --selected-row: #16213d;
+  }
+}
+
+html[data-theme="dark"] {
+  --sts-surface: #111827;
+  --sts-canvas: #0b1120;
+  --sts-muted: #94a3b8;
+  --sts-shadow: 0 0 0 1px rgb(255 255 255 / 0.04);
+
+  --primary: var(--sts-brand-500);
+  --secondary: var(--sts-brand-600);
+  --body-fg: #e2e8f0;
+  --body-bg: var(--sts-canvas);
+  --body-quiet-color: #94a3b8;
+  --body-medium-color: #cbd5e1;
+  --body-loud-color: #f8fafc;
+  --header-bg: var(--sts-surface);
+  --header-color: #cbd5e1;
+  --header-branding-color: #f8fafc;
+  --header-link-color: #cbd5e1;
+  --breadcrumbs-bg: var(--sts-surface);
+  --breadcrumbs-fg: #94a3b8;
+  --breadcrumbs-link-fg: #93b4ff;
+  --link-fg: #93b4ff;
+  --link-hover-color: #c7d7ff;
+  --link-selected-fg: #93b4ff;
+  --hairline-color: #1f2937;
+  --border-color: #334155;
+  --message-success-bg: #052e1f;
+  --message-warning-bg: #2d2205;
+  --message-error-bg: #3a0d0d;
+  --message-info-bg: #111c3d;
+  --darkened-bg: #1a2233;
+  --selected-bg: #1c2a4a;
+  --selected-row: #16213d;
+}
+
+/* ---------- Base ---------- */
+body {
+  font-size: 14px;
+  background: var(--body-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--sts-brand-500);
+  outline-offset: 2px;
+}
+
+/* ---------- Header ---------- */
+#header {
+  min-height: 64px;
+  padding: 10px 32px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--hairline-color);
+  color: var(--header-color);
+}
+
+#branding { display: flex; align-items: center; gap: 12px; }
+
+.sts-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+.sts-brand:hover { text-decoration: none; }
+
+.sts-brand__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--sts-brand-700), var(--sts-brand-950));
+  color: #fff;
+}
+.sts-brand__mark svg { width: 18px; height: 18px; }
+
+.sts-brand__text { display: flex; flex-direction: column; line-height: 1.2; }
+
+#site-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--header-branding-color);
+}
+
+.sts-brand__tag { font-size: 12px; color: var(--body-quiet-color); }
+
+#user-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#user-tools a,
+#logout-form button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border-bottom: 0;
+  color: var(--header-link-color);
+  text-decoration: none;
+}
+#user-tools a:hover,
+#user-tools a:focus,
+#logout-form button:hover,
+#logout-form button:focus {
+  background: var(--darkened-bg);
+  color: var(--body-loud-color);
+  text-decoration: none;
+}
+
+.sts-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  padding-right: 12px;
+  border-right: 1px solid var(--hairline-color);
+}
+.sts-user__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--sts-brand-100);
+  color: var(--sts-brand-700);
+  font-size: 13px;
+  font-weight: 650;
+}
+.sts-user__name { font-weight: 600; color: var(--body-loud-color); }
+
+.theme-toggle svg.theme-icon-when-auto,
+.theme-toggle svg.theme-icon-when-dark,
+.theme-toggle svg.theme-icon-when-light { fill: var(--header-link-color); color: var(--header-bg); }
+
+/* ---------- Breadcrumbs ---------- */
+div.breadcrumbs,
+.breadcrumbs {
+  padding: 10px 32px;
+  border-bottom: 1px solid var(--hairline-color);
+  font-size: 13px;
+}
+
+/* ---------- Content ---------- */
+#content { padding: 24px 32px 40px; }
+
+#content h1 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--body-loud-color);
+}
+
+.module {
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--sts-radius);
+  background: var(--sts-surface);
+  box-shadow: var(--sts-shadow);
+  overflow: hidden;
+}
+
+.module h2,
+.module caption,
+.inline-group h2 {
+  padding: 12px 16px;
+  background: var(--sts-surface);
+  border-bottom: 1px solid var(--hairline-color);
+  color: var(--body-loud-color);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+fieldset.module { padding: 0; }
+.aligned .form-row { padding: 14px 16px; }
+
+/* Forms */
+input[type=text], input[type=password], input[type=email], input[type=url],
+input[type=number], input[type=tel], input[type=search], textarea, select,
+.vTextField {
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--sts-surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input[type=text]:focus, input[type=password]:focus, input[type=email]:focus,
+input[type=url]:focus, input[type=number]:focus, input[type=search]:focus,
+textarea:focus, select:focus, .vTextField:focus {
+  border-color: var(--sts-brand-500);
+  box-shadow: 0 0 0 3px var(--sts-ring);
+  outline: none;
+}
+
+/* Buttons */
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background-color 0.15s;
+}
+.submit-row {
+  padding: 14px 16px;
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--sts-radius);
+  background: var(--sts-surface);
+}
+.submit-row a.deletelink { border-radius: 8px; }
+
+.object-tools a:link,
+.object-tools a:visited {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Changelist */
+#changelist .actions,
+#changelist #toolbar {
+  border-radius: var(--sts-radius) var(--sts-radius) 0 0;
+  background: var(--sts-surface);
+  border-bottom: 1px solid var(--hairline-color);
+}
+#changelist .results { border-radius: 0 0 var(--sts-radius) var(--sts-radius); }
+#changelist-filter {
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--sts-radius);
+  background: var(--sts-surface);
+}
+
+thead th, tfoot td {
+  background: var(--darkened-bg);
+  color: var(--body-quiet-color);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+td, th { border-bottom-color: var(--hairline-color); }
+
+/* Messages */
+ul.messagelist li {
+  margin: 0 0 8px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+/* Left nav sidebar (changelists / forms) */
+#nav-sidebar { background: var(--sts-surface); border-right: 1px solid var(--hairline-color); }
+#nav-sidebar .module { border: 0; border-radius: 0; box-shadow: none; }
+#nav-sidebar .current-model { background: var(--selected-row); }
+.toggle-nav-sidebar { background: var(--sts-surface); border-right-color: var(--hairline-color); }
+
+/* ---------- Small screens ---------- */
+@media (max-width: 767px) {
+  #header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  #user-tools { flex-wrap: wrap; }
+  .sts-brand__tag { display: none; }
+  .sts-user { border-right: 0; padding-right: 0; }
+  div.breadcrumbs, .breadcrumbs { padding: 10px 16px; }
+  #content { padding: 16px; }
+}
