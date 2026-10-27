@@ -1,0 +1,58 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NOC · {{ employee.full_name }} · {{ noc.reference_no }}</title>
+  <link rel="stylesheet" href="{% static 'css/print-doc.css' %}">
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    <a href="{% url 'admin:hr_nocrequest_changelist' %}">Back to NOC requests</a>
+  </div>
+
+  <main class="sheet">
+    <header class="letterhead">
+      <div class="letterhead__brand">
+        <span class="letterhead__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+        <div><h1>{{ company_name }}</h1><p>{{ company_address }}</p></div>
+      </div>
+      <div class="doc-title"><strong>No Objection Certificate</strong></div>
+    </header>
+
+    <section class="letter">
+      <div class="ref">
+        <span>Ref: {{ noc.reference_no }}</span>
+        <span>Date: {{ noc.reviewed_at|date:"j F Y" }}</span>
+      </div>
+
+      <p>{% if noc.addressed_to %}{{ noc.addressed_to|linebreaksbr }}{% else %}To Whom It May Concern{% endif %}</p>
+
+      <p class="subject">Subject: No Objection Certificate for {{ employee.full_name }}</p>
+
+      <p>
+        This is to certify that <strong>{{ employee.full_name }}</strong> (Employee ID {{ employee.employee_id }}),
+        {{ employee.designation }}, {{ employee.department }}, has been employed with {{ company_name }}
+        since {{ employee.joining_date|date:"j F Y" }}{% if employee.is_active %} and is currently in active service{% endif %}.
+      </p>
+
+      <p>
+        {{ company_name }} has no objection to
+        {% if noc.purpose == "travel" %}{{ employee.full_name }} travelling abroad{% if noc.travel_from %} from {{ noc.travel_from|date:"j F Y" }}{% if noc.travel_to %} to {{ noc.travel_to|date:"j F Y" }}{% endif %}{% endif %}{% elif noc.purpose == "study" %}{{ employee.full_name }} pursuing higher study{% elif noc.purpose == "bank" %}{{ employee.full_name }} applying for a bank loan or account{% elif noc.purpose == "job" %}{{ employee.full_name }} applying for other employment{% else %}the request of {{ employee.full_name }} described below{% endif %}.
+        {% if noc.purpose == "travel" %}The employee is expected to resume duties on return.{% endif %}
+      </p>
+
+      <p>{{ noc.details|linebreaksbr }}</p>
+
+      <p>This certificate is issued on the employee's request for the purpose stated above and carries no other financial or legal responsibility for the company.</p>
+
+      <div class="closing">
+        <p>Sincerely,</p>
+        <div class="line"></div>
+        <p><strong>Authorized Signatory</strong><br>Human Resources, {{ company_name }}</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

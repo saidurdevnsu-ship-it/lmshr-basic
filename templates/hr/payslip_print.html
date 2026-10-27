@@ -1,0 +1,66 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pay slip · {{ employee.full_name }} · {{ slip.period_label }}</title>
+  <link rel="stylesheet" href="{% static 'css/print-doc.css' %}">
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    <a href="{% url 'admin:hr_payslip_changelist' %}">Back to pay slips</a>
+  </div>
+
+  <main class="sheet">
+    {% if slip.status == "draft" %}<p class="watermark-draft">DRAFT. Not yet finalized by HR.</p>{% endif %}
+    <header class="letterhead">
+      <div class="letterhead__brand">
+        <span class="letterhead__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+        <div><h1>{{ company_name }}</h1><p>{{ company_address }}</p></div>
+      </div>
+      <div class="doc-title"><strong>Pay slip</strong><p>{{ slip.period_label }}</p></div>
+    </header>
+
+    <dl class="meta">
+      <div><dt>Employee</dt><dd>{{ employee.full_name }}</dd></div>
+      <div><dt>Employee ID</dt><dd>{{ employee.employee_id }}</dd></div>
+      <div><dt>Designation</dt><dd>{{ employee.designation }}</dd></div>
+      <div><dt>Department</dt><dd>{{ employee.department }}</dd></div>
+      <div><dt>Working days</dt><dd>{{ slip.working_days }} of {{ slip.days_in_month }}</dd></div>
+      <div><dt>Absent / unpaid leave</dt><dd>{{ slip.absent_days|floatformat:"-1" }} / {{ slip.unpaid_leave_days|floatformat:"-1" }} days</dd></div>
+      {% if employee.bank_account %}<div><dt>Bank</dt><dd>{{ employee.bank_name }} · {{ employee.bank_account }}</dd></div>{% endif %}
+      <div><dt>Joined</dt><dd>{{ employee.joining_date|date:"j M Y" }}</dd></div>
+    </dl>
+
+    <div class="columns">
+      <table class="money">
+        <caption>Earnings</caption>
+        <tbody>
+          <tr><td>Basic salary</td><td>{{ slip.basic_salary|floatformat:"2g" }}</td></tr>
+          <tr><td>House rent</td><td>{{ slip.house_rent|floatformat:"2g" }}</td></tr>
+          <tr><td>Medical allowance</td><td>{{ slip.medical_allowance|floatformat:"2g" }}</td></tr>
+          <tr><td>Conveyance</td><td>{{ slip.conveyance_allowance|floatformat:"2g" }}</td></tr>
+          <tr><td>Other allowance</td><td>{{ slip.other_allowance|floatformat:"2g" }}</td></tr>
+        </tbody>
+        <tfoot><tr><td>Gross earnings</td><td>{{ slip.gross_salary|floatformat:"2g" }}</td></tr></tfoot>
+      </table>
+      <table class="money">
+        <caption>Deductions</caption>
+        <tbody>
+          <tr><td>Absence / unpaid leave</td><td>{{ slip.absence_deduction|floatformat:"2g" }}</td></tr>
+          <tr><td>Provident fund</td><td>{{ slip.provident_fund|floatformat:"2g" }}</td></tr>
+          <tr><td>Income tax</td><td>{{ slip.tax|floatformat:"2g" }}</td></tr>
+          <tr><td>Other</td><td>{{ slip.other_deduction|floatformat:"2g" }}</td></tr>
+        </tbody>
+        <tfoot><tr><td>Total deductions</td><td>{{ slip.total_deduction|floatformat:"2g" }}</td></tr></tfoot>
+      </table>
+    </div>
+
+    <div class="net"><span>Net pay</span><strong>{{ currency }} {{ slip.net_pay|floatformat:"2g" }}</strong></div>
+
+    <div class="signature"><div>Employee</div><div>Authorized signatory, HR</div></div>
+    <p class="note">This is a system-generated pay slip from STS Pulse. Generated {{ slip.updated_at|date:"j M Y, g:i A" }}.</p>
+  </main>
+</body>
+</html>

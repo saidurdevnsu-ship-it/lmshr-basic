@@ -1,0 +1,94 @@
+/* STS Pulse — HR dashboard and HR pages (builds on admin-dashboard.css) */
+
+.hr-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.dash-btn--secondary:link,
+.dash-btn--secondary:visited {
+  background: var(--sts-surface);
+  color: var(--body-loud-color);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+.dash-btn--secondary:hover { background: var(--darkened-bg); text-decoration: none; }
+
+/* Today card */
+.hr-today {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+}
+.hr-today__status { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.hr-times { display: flex; gap: 24px; margin: 0; }
+.hr-times div { display: flex; flex-direction: column; }
+.hr-times dt { font-size: 12px; color: var(--body-quiet-color); }
+.hr-times dd { margin: 2px 0 0; font-size: 16px; font-weight: 650; color: var(--body-loud-color); font-variant-numeric: tabular-nums; }
+.hr-today__actions form { margin: 0; }
+
+.hr-btn {
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sts-surface);
+  color: var(--body-loud-color);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.hr-btn:hover { background: var(--darkened-bg); }
+.hr-btn--primary { background: var(--sts-brand-600); color: #fff; box-shadow: none; }
+.hr-btn--primary:hover { background: var(--sts-brand-700); }
+
+/* This month strip */
+.hr-month { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 18px; }
+.hr-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hr-day--present { background: #e6f6ee; color: #11734b; }
+.hr-day--late, .hr-day--half_day { background: #fdf1dc; color: #9a5b00; }
+.hr-day--absent { background: #fdecec; color: #b42318; }
+.hr-day--on_leave { background: #e7eefe; color: #2a55e0; }
+
+/* Leave balance */
+.hr-balance { margin: 0; padding: 12px 20px 16px; list-style: none; }
+.hr-balance li { list-style: none; padding: 8px 0; }
+.hr-balance__row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 550; color: var(--body-medium-color); }
+.hr-balance__num { font-weight: 650; color: var(--body-loud-color); font-variant-numeric: tabular-nums; }
+.hr-balance__num small { font-weight: 400; color: var(--body-quiet-color); font-size: 12px; }
+.hr-bar { height: 6px; margin-top: 8px; border-radius: 999px; background: var(--darkened-bg); overflow: hidden; }
+.hr-bar span { display: block; height: 100%; max-width: 100%; border-radius: inherit; background: var(--sts-brand-500); }
+
+.hr-count {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fdf1dc;
+  color: #9a5b00;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+/* Mark attendance page */
+.hr-mark-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.hr-mark-head form { display: flex; align-items: flex-end; gap: 8px; }
+.hr-mark-head label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+.hr-mark-table select, .hr-mark-table input[type=text] { width: 100%; box-sizing: border-box; }
+.hr-mark-table td { vertical-align: middle; }
+.hr-quickset { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--body-quiet-color); }
+.hr-notice { margin: 0 0 16px; padding: 10px 14px; border-radius: 10px; background: var(--message-warning-bg); font-size: 13px; }
+
+html[data-theme="dark"] .hr-day--present { background: #052e1f; color: #6ee7b7; }
+html[data-theme="dark"] .hr-day--late, html[data-theme="dark"] .hr-day--half_day { background: #2d2205; color: #f5c068; }
+html[data-theme="dark"] .hr-day--absent { background: #3a0d0d; color: #fca5a5; }
+html[data-theme="dark"] .hr-day--on_leave { background: #16213d; color: #93b4ff; }

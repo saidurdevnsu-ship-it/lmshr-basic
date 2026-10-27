@@ -1,0 +1,84 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-hr.css' %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-hr model-attendance{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">Home</a></li>
+  <li><a href="{% url 'admin:app_list' app_label='hr' %}">HR</a></li>
+  <li><a href="{% url 'admin:hr_attendance_changelist' %}">Attendance</a></li>
+  <li aria-current="page">Mark attendance</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="hr-mark-head">
+  <form method="get">
+    <div>
+      <label for="mark-date">Date</label>
+      <input type="date" id="mark-date" name="date" value="{{ day|date:'Y-m-d' }}">
+    </div>
+    <button type="submit" class="button">Load</button>
+  </form>
+  <div class="hr-quickset">
+    Set everyone to:
+    {% for value, label in statuses %}<button type="button" class="button" data-set-all="{{ value }}">{{ label }}</button>{% endfor %}
+  </div>
+</div>
+
+{% if not is_workday %}
+<p class="hr-notice">{{ day|date:"l, j F Y" }} is a weekend or holiday. You can still record attendance, but it won't count toward pay deductions.</p>
+{% endif %}
+
+{% if rows %}
+<form method="post">
+  {% csrf_token %}
+  <div class="module">
+    <table class="hr-mark-table" style="width:100%">
+      <caption>{{ day|date:"l, j F Y" }} · {{ rows|length }} active employee{{ rows|length|pluralize }}</caption>
+      <thead>
+        <tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col">Check in / out</th><th scope="col" style="width:180px">Status</th><th scope="col">Note</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><strong>{{ row.employee.full_name }}</strong><br><span class="quiet">{{ row.employee.employee_id }} · {{ row.employee.designation }}</span></td>
+          <td>{{ row.employee.department }}</td>
+          <td>{% if row.record.check_in %}{{ row.record.check_in|time:"g:i A" }}{% if row.record.check_out %} – {{ row.record.check_out|time:"g:i A" }}{% endif %}{% else %}—{% endif %}</td>
+          <td>
+            <label class="visually-hidden" for="status_{{ row.employee.pk }}">Status for {{ row.employee.full_name }}</label>
+            <select name="status_{{ row.employee.pk }}" id="status_{{ row.employee.pk }}" data-status>
+              <option value="">— Not marked —</option>
+              {% for value, label in statuses %}
+              <option value="{{ value }}"{% if row.record.status == value %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <label class="visually-hidden" for="note_{{ row.employee.pk }}">Note for {{ row.employee.full_name }}</label>
+            <input type="text" name="note_{{ row.employee.pk }}" id="note_{{ row.employee.pk }}" value="{{ row.record.note|default:'' }}" maxlength="255">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="submit-row" style="margin-top:16px">
+    <input type="submit" value="Save attendance" class="default">
+  </div>
+</form>
+{% else %}
+<p>No active employees yet. <a href="{% url 'admin:hr_employee_add' %}">Add an employee</a> first.</p>
+{% endif %}
+
+<script>
+  document.querySelectorAll('[data-set-all]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('[data-status]').forEach(function (sel) { sel.value = btn.dataset.setAll; });
+    });
+  });
+</script>
+{% endblock %}

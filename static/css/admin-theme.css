@@ -261,6 +261,56 @@ textarea:focus-visible {
 .theme-toggle svg.theme-icon-when-dark,
 .theme-toggle svg.theme-icon-when-light { fill: var(--header-link-color); color: var(--header-bg); }
 
+/* ---------- Workspace tabs (Academic | HR) ---------- */
+.sts-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 32px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--hairline-color);
+}
+.sts-tab:link,
+.sts-tab:visited {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -1px;
+  padding: 12px 14px;
+  border-bottom: 2px solid transparent;
+  color: var(--body-quiet-color);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sts-tab svg { width: 17px; height: 17px; }
+.sts-tab:hover { color: var(--body-loud-color); text-decoration: none; }
+.sts-tab.is-active:link,
+.sts-tab.is-active:visited { color: var(--link-fg); border-bottom-color: var(--link-fg); }
+#header { border-bottom: 0; }
+
+/* Status badges used across HR lists */
+.hr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hr-badge::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.hr-badge--present, .hr-badge--approved, .hr-badge--final { background: #e6f6ee; color: #11734b; }
+.hr-badge--late, .hr-badge--half_day, .hr-badge--pending, .hr-badge--draft { background: #fdf1dc; color: #9a5b00; }
+.hr-badge--absent, .hr-badge--rejected { background: #fdecec; color: #b42318; }
+.hr-badge--on_leave { background: #e7eefe; color: #2a55e0; }
+.hr-badge--cancelled { background: #eef1f5; color: #546173; }
+html[data-theme="dark"] .hr-badge { background: #1f2937; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hr-badge { background: #1f2937; }
+}
+
 /* ---------- Breadcrumbs ---------- */
 div.breadcrumbs,
 .breadcrumbs {
@@ -403,5 +453,6 @@ ul.messagelist li {
   .sts-brand__tag { display: none; }
   .sts-user { border-right: 0; padding-right: 0; }
   div.breadcrumbs, .breadcrumbs { padding: 10px 16px; }
+  .sts-tabs { padding: 0 8px; }
   #content { padding: 16px; }
 }

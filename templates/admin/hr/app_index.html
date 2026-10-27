@@ -1,0 +1,267 @@
+{% extends "admin/base_site.html" %}
+{% load static hr_tags %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-dashboard.css' %}"><link rel="stylesheet" href="{% static 'css/admin-hr.css' %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} sts-dashboard sts-hr app-hr{% endblock %}
+
+{% block nav-breadcrumbs %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block content %}
+{% hr_dashboard as hr %}
+{% firstof user.get_short_name user.get_username as display_name %}
+{% url 'admin:app_list' app_label='hr' as hr_home %}
+
+<div class="dash">
+
+  <section class="dash-hero" aria-labelledby="hr-title">
+    <div>
+      <p class="dash-hero__eyebrow">{{ hr.today|date:"l, j F Y" }}</p>
+      <h1 id="hr-title">HR · {{ display_name }}</h1>
+      <p class="dash-hero__sub">
+        {% if hr.employee %}{{ hr.employee.designation }}, {{ hr.employee.department }} · ID {{ hr.employee.employee_id }}{% else %}People, attendance, leave and payroll.{% endif %}
+      </p>
+    </div>
+    {% if hr.employee %}
+    <div class="hr-hero-actions">
+      <a class="dash-btn dash-btn--secondary" href="{% url 'admin:hr_nocrequest_add' %}">Request NOC</a>
+      <a class="dash-btn dash-btn--primary" href="{% url 'admin:hr_leaverequest_add' %}">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z"/></svg>
+        Request leave
+      </a>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if hr.is_manager %}
+  <section class="dash-stats" aria-label="Today at a glance">
+    <a class="stat" href="{% url 'admin:hr_employee_changelist' %}?is_active__exact=1">
+      <span class="stat__icon stat__icon--blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg></span>
+      <span class="stat__label">Active employees</span>
+      <span class="stat__value">{{ hr.stats.employees }}</span>
+      <span class="stat__meta">On payroll and attendance</span>
+    </a>
+    <a class="stat" href="{% url 'admin:hr_attendance_changelist' %}?date__day={{ hr.today.day }}&date__month={{ hr.today.month }}&date__year={{ hr.today.year }}">
+      <span class="stat__icon stat__icon--teal" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span>
+      <span class="stat__label">Present today</span>
+      <span class="stat__value">{{ hr.stats.present }}</span>
+      <span class="stat__meta">{{ hr.stats.late }} late · {{ hr.stats.on_leave }} on leave · {{ hr.stats.absent }} absent{% if hr.is_workday %} · {{ hr.stats.unmarked }} not marked{% endif %}</span>
+    </a>
+    <a class="stat" href="{% url 'admin:hr_leaverequest_changelist' %}?status__exact=pending">
+      <span class="stat__icon stat__icon--amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></span>
+      <span class="stat__label">Pending requests</span>
+      <span class="stat__value">{{ hr.stats.pending_leave|add:hr.stats.pending_noc }}</span>
+      <span class="stat__meta">{{ hr.stats.pending_leave }} leave · {{ hr.stats.pending_noc }} NOC</span>
+    </a>
+    <a class="stat" href="{% url 'admin:hr_payslip_changelist' %}?status__exact=draft">
+      <span class="stat__icon stat__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 9.5h.01M18 15.5h.01"/></svg></span>
+      <span class="stat__label">Draft pay slips</span>
+      <span class="stat__value">{{ hr.stats.draft_payslips }}</span>
+      <span class="stat__meta">Waiting to be finalized</span>
+    </a>
+  </section>
+  {% endif %}
+
+  <div class="dash-grid">
+    <div class="dash-main">
+
+      {% if hr.employee %}
+      <section class="panel" aria-labelledby="today-title">
+        <header class="panel__head panel__head--row">
+          <div>
+            <h2 id="today-title">My attendance today</h2>
+            <p>{% if hr.is_workday %}Office starts at {{ hr.office_start|time:"g:i A" }}. Check in when you arrive and check out when you leave.{% else %}Today is a weekend or holiday.{% endif %}</p>
+          </div>
+          <a class="dash-link" href="{% url 'admin:hr_attendance_changelist' %}">My history</a>
+        </header>
+        <div class="hr-today">
+          <div class="hr-today__status">
+            {% if hr.today_record %}
+              <span class="hr-badge hr-badge--{{ hr.today_record.status }}">{{ hr.today_record.get_status_display }}</span>
+              <dl class="hr-times">
+                <div><dt>Check in</dt><dd>{{ hr.today_record.check_in|time:"g:i A"|default:"—" }}</dd></div>
+                <div><dt>Check out</dt><dd>{{ hr.today_record.check_out|time:"g:i A"|default:"—" }}</dd></div>
+              </dl>
+            {% else %}
+              <span class="hr-badge hr-badge--cancelled">Not checked in</span>
+            {% endif %}
+          </div>
+          {% if hr.is_workday %}
+          <div class="hr-today__actions">
+            {% if not hr.today_record %}
+            <form method="post" action="{% url 'admin:hr_check_in' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ hr_home }}">
+              <button type="submit" class="hr-btn hr-btn--primary">Check in</button>
+            </form>
+            {% elif hr.today_record.check_in and not hr.today_record.check_out %}
+            <form method="post" action="{% url 'admin:hr_check_out' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ hr_home }}">
+              <button type="submit" class="hr-btn">Check out</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+        {% if hr.my_month_attendance %}
+        <div class="hr-month" aria-label="This month">
+          {% for a in hr.my_month_attendance %}
+          <span class="hr-day hr-day--{{ a.status }}" title="{{ a.date|date:'D j M' }}: {{ a.get_status_display }}">{{ a.date|date:"j" }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </section>
+      {% elif not hr.is_manager %}
+      <section class="panel"><p class="empty">Your HR profile isn't set up yet. Ask HR to add you as an employee to use attendance, leave, NOC and pay slips.</p></section>
+      {% endif %}
+
+      {% if hr.is_manager %}
+      <section class="panel" aria-labelledby="approvals-title">
+        <header class="panel__head panel__head--row">
+          <div>
+            <h2 id="approvals-title">Waiting for approval</h2>
+            <p>Select requests in the list and use Approve or Reject.</p>
+          </div>
+        </header>
+        {% if hr.pending_leave or hr.pending_noc %}
+        <div class="table-wrap">
+          <table class="dash-table">
+            <thead><tr><th scope="col">Employee</th><th scope="col">Request</th><th scope="col">When</th><th scope="col"></th></tr></thead>
+            <tbody>
+              {% for l in hr.pending_leave %}
+              <tr>
+                <td>{{ l.employee.full_name }}</td>
+                <td>{{ l.leave_type }} leave · {{ l.days|floatformat:"-1" }} day{{ l.days|pluralize }}</td>
+                <td>{{ l.start_date|date:"j M" }}{% if l.end_date != l.start_date %} – {{ l.end_date|date:"j M" }}{% endif %}</td>
+                <td><a class="dash-link" href="{% url 'admin:hr_leaverequest_change' l.pk %}">Review</a></td>
+              </tr>
+              {% endfor %}
+              {% for n in hr.pending_noc %}
+              <tr>
+                <td>{{ n.employee.full_name }}</td>
+                <td>NOC · {{ n.get_purpose_display }}</td>
+                <td>Asked {{ n.created_at|timesince }} ago</td>
+                <td><a class="dash-link" href="{% url 'admin:hr_nocrequest_change' n.pk %}">Review</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="empty">Nothing waiting. All leave and NOC requests are reviewed.</p>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      <section class="panel" aria-labelledby="hr-workspace-title">
+        <header class="panel__head">
+          <h2 id="hr-workspace-title">HR workspace</h2>
+          <p>Employees, attendance, leave, NOC, payroll, users and roles.</p>
+        </header>
+        <div class="apps">
+          {% for app in app_list %}
+          <div class="app">
+            <div class="app__head"><h3>{{ app.name }}</h3></div>
+            <ul class="app__models">
+              {% for model in app.models %}
+              <li class="model">
+                <span class="model__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  {% if model.object_name == "Employee" %}<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+                  {% elif model.object_name == "Attendance" %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                  {% elif model.object_name == "LeaveRequest" or model.object_name == "LeaveType" or model.object_name == "Holiday" %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
+                  {% elif model.object_name == "NOCRequest" %}<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6M9 15l2 2 4-4"/>
+                  {% elif model.object_name == "Payslip" %}<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/>
+                  {% else %}<path d="M4 7h16M4 12h16M4 17h10"/>{% endif %}
+                  </svg>
+                </span>
+                {% if model.admin_url %}<a class="model__name" href="{{ model.admin_url }}">{{ model.name }}</a>{% else %}<span class="model__name">{{ model.name }}</span>{% endif %}
+                <span class="model__actions">
+                  {% if model.add_url %}<a class="chip" href="{{ model.add_url }}">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z"/></svg>Add</a>{% endif %}
+                  {% if model.admin_url %}<a class="chip chip--ghost" href="{{ model.admin_url }}">{% if model.view_only %}View{% else %}Manage{% endif %}</a>{% endif %}
+                </span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endfor %}
+          {% if perms.auth.view_user or perms.auth.view_group %}
+          <div class="app">
+            <div class="app__head"><h3>Accounts &amp; access</h3></div>
+            <ul class="app__models">
+              {% if perms.auth.view_user %}
+              <li class="model">
+                <span class="model__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+                <a class="model__name" href="{% url 'admin:auth_user_changelist' %}">Users</a>
+                <span class="model__actions">
+                  {% if perms.auth.add_user %}<a class="chip" href="{% url 'admin:auth_user_add' %}"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z"/></svg>Add</a>{% endif %}
+                  <a class="chip chip--ghost" href="{% url 'admin:auth_user_changelist' %}">Manage</a>
+                </span>
+              </li>
+              {% endif %}
+              {% if perms.auth.view_group %}
+              <li class="model">
+                <span class="model__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg></span>
+                <a class="model__name" href="{% url 'admin:auth_group_changelist' %}">Roles</a>
+                <span class="model__actions">
+                  {% if perms.auth.add_group %}<a class="chip" href="{% url 'admin:auth_group_add' %}"><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z"/></svg>Add</a>{% endif %}
+                  <a class="chip chip--ghost" href="{% url 'admin:auth_group_changelist' %}">Manage</a>
+                </span>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <aside class="dash-side">
+      {% if hr.is_manager %}
+      <section class="panel" aria-labelledby="hr-quick-title">
+        <header class="panel__head"><h2 id="hr-quick-title">HR actions</h2></header>
+        <ul class="quick">
+          <li><a href="{% url 'admin:hr_mark_attendance' %}"><span>Mark today's attendance</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+          <li><a href="{% url 'admin:hr_payslip_generate' %}"><span>Generate pay slips</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+          <li><a href="{% url 'admin:hr_employee_add' %}"><span>Add an employee</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+          <li><a href="{% url 'admin:hr_holiday_changelist' %}"><span>Holidays calendar</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+        </ul>
+      </section>
+      {% endif %}
+
+      {% if hr.employee %}
+      <section class="panel" aria-labelledby="balance-title">
+        <header class="panel__head panel__head--row">
+          <h2 id="balance-title">My leave balance · {{ hr.today.year }}</h2>
+        </header>
+        <ul class="hr-balance">
+          {% for b in hr.balances %}
+          <li>
+            <div class="hr-balance__row">
+              <span>{{ b.type.name }}</span>
+              <span class="hr-balance__num">{% if b.remaining is None %}{{ b.used|floatformat:"-1" }} used{% else %}{{ b.remaining|floatformat:"-1" }} <small>of {{ b.allowed }} left</small>{% endif %}</span>
+            </div>
+            {% if b.allowed %}<div class="hr-bar"><span style="width: {% widthratio b.used b.allowed 100 %}%"></span></div>{% endif %}
+          </li>
+          {% empty %}
+          <li class="empty">No leave types set up yet.</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="panel" aria-labelledby="mine-title">
+        <header class="panel__head"><h2 id="mine-title">My requests &amp; pay</h2></header>
+        <ul class="quick">
+          <li><a href="{% url 'admin:hr_leaverequest_changelist' %}"><span>My leave requests{% if hr.my_pending %} <span class="hr-count">{{ hr.my_pending }} pending</span>{% endif %}</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+          <li><a href="{% url 'admin:hr_nocrequest_changelist' %}"><span>My NOC requests</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+          {% if hr.my_latest_payslip %}
+          <li><a href="{% url 'admin:hr_payslip_print' hr.my_latest_payslip.pk %}" target="_blank" rel="noopener"><span>Latest pay slip · {{ hr.my_latest_payslip.period_label }}</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+          {% endif %}
+          <li><a href="{% url 'admin:hr_payslip_changelist' %}"><span>All my pay slips</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+        </ul>
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

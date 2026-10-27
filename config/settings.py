@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'learning.apps.LearningConfig',
     'questionbank.apps.QuestionbankConfig',
+    'hr.apps.HrConfig',
 ]
 
 MIDDLEWARE = [
@@ -110,7 +111,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Dhaka'
 
 USE_I18N = True
 
@@ -130,6 +131,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Claude question generation. The API key is read from the ANTHROPIC_API_KEY environment variable.
 QUESTION_GENERATION_MODEL = os.environ.get('QUESTION_GENERATION_MODEL', 'claude-opus-5-5')
+
+
+# HR
+HR_COMPANY_NAME = os.environ.get('HR_COMPANY_NAME', 'STS Group')
+HR_COMPANY_ADDRESS = os.environ.get('HR_COMPANY_ADDRESS', 'Dhaka, Bangladesh')
+HR_REFERENCE_PREFIX = 'STS/HR'
+HR_CURRENCY = '৳'
+HR_WEEKEND_DAYS = [4, 5]  # Python weekday numbers: 4 = Friday, 5 = Saturday
+HR_OFFICE_START = '09:00'  # 24-hour local time
+HR_LATE_GRACE_MINUTES = 15
 
 
 # Email

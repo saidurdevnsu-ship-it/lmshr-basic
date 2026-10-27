@@ -1,6 +1,5 @@
 from django import template
 from django.contrib import admin
-from django.contrib.auth import get_user_model
 from django.db.models import Sum
 
 from learning.models import Course, CourseModule, LearningActivity
@@ -54,9 +53,5 @@ def dashboard_stats(context):
         stats["activities_total"] = activities.count()
         minutes = activities.aggregate(total=Sum("estimated_minutes"))["total"] or 0
         stats["learning_hours"] = round(minutes / 60, 1)
-
-    user_model = get_user_model()
-    if request.user.has_perm(f"{user_model._meta.app_label}.view_{user_model._meta.model_name}"):
-        stats["users_total"] = user_model.objects.filter(is_active=True).count()
 
     return stats

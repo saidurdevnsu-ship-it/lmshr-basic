@@ -31,3 +31,20 @@
 {% endblock %}
 
 {% block nav-global %}{% endblock %}
+
+{% block header %}
+{{ block.super }}
+{% if has_permission and not is_popup and perms.hr %}
+{% url 'admin:app_list' app_label='hr' as hr_url %}{% url 'admin:app_list' app_label='auth' as auth_url %}
+<nav class="sts-tabs" aria-label="Workspaces">
+  <a class="sts-tab{% if hr_url not in request.path and auth_url not in request.path %} is-active{% endif %}" href="{% url 'admin:index' %}"{% if hr_url not in request.path and auth_url not in request.path %} aria-current="page"{% endif %}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 9 12 4 2 9l10 5 10-5Z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>
+    Academic
+  </a>
+  <a class="sts-tab{% if hr_url in request.path or auth_url in request.path %} is-active{% endif %}" href="{{ hr_url }}"{% if hr_url in request.path or auth_url in request.path %} aria-current="page"{% endif %}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-3-5.5"/></svg>
+    HR
+  </a>
+</nav>
+{% endif %}
+{% endblock %}
