@@ -1,7 +1,34 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 from django.utils import timezone
 
 from .models import Course, CourseModule, LearningActivity
+
+
+class RoleListFilter(admin.RelatedFieldListFilter):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.title = "role"
+
+
+admin.site.unregister(User)
+
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin):
+    """Django's user admin, with "groups" presented as roles."""
+
+    list_filter = ("is_staff", "is_superuser", "is_active", ("groups", RoleListFilter))
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_manytomany(db_field, request, **kwargs)
+        if db_field.name == "groups":
+            formfield.label = "Roles"
+            formfield.help_text = (
+                "The roles this user has. A user gets all permissions granted to each of their roles."
+            )
+        return formfield
 
 
 class CourseModuleInline(admin.TabularInline):

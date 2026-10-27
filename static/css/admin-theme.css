@@ -346,6 +346,20 @@ textarea:focus, select:focus, .vTextField:focus {
   text-transform: none;
 }
 
+/* Icon buttons ("Add role +", "View on site →"): give the icon its own space so it never overlaps the text. */
+.object-tools a.addlink:link,
+.object-tools a.addlink:visited {
+  padding-left: 34px;
+  background-position: left 14px center;
+  background-size: 12px 12px;
+}
+.object-tools a.viewsitelink:link,
+.object-tools a.viewsitelink:visited {
+  padding-right: 34px;
+  background-position: right 14px center;
+  background-size: 12px 12px;
+}
+
 /* Changelist */
 #changelist .actions,
 #changelist #toolbar {

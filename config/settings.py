@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'learning.apps.LearningConfig',
+    'questionbank.apps.QuestionbankConfig',
 ]
 
 MIDDLEWARE = [
@@ -121,6 +122,14 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Uploaded books / knowledge sources
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# Claude question generation. The API key is read from the ANTHROPIC_API_KEY environment variable.
+QUESTION_GENERATION_MODEL = os.environ.get('QUESTION_GENERATION_MODEL', 'claude-opus-5-5')
 
 
 # Email

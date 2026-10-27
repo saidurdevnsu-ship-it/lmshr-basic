@@ -1,0 +1,135 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-generate.css' %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-questionbank model-question sts-generate{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">Home</a></li>
+  <li><a href="{% url 'admin:app_list' app_label='questionbank' %}">Question bank</a></li>
+  <li><a href="{% url 'admin:questionbank_question_changelist' %}">Questions</a></li>
+  <li aria-current="page">Generate with AI</li>
+</ol>
+{% endblock %}
+
+{% block content_title %}
+<div class="gen-head">
+  <h1>Generate questions</h1>
+  <p>Pick a subject and grade. Claude reads the books uploaded for them and writes questions, saved as drafts for you to review.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="gen">
+  <form method="post" class="gen-card" id="generate-form" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="gen-alert" role="alert">
+      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 0-1 1v4a1 1 0 1 0 2 0V6a1 1 0 0 0-1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <div>{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>
+    </div>
+    {% endif %}
+
+    <fieldset class="gen-section">
+      <legend><span class="gen-step">1</span> What to cover</legend>
+      <div class="gen-grid">
+        {% for field in form %}{% if field.name == "subject" or field.name == "grade" %}
+        <div class="gen-field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for e in field.errors %}<p class="gen-error">{{ e }}</p>{% endfor %}
+        </div>
+        {% endif %}{% endfor %}
+      </div>
+      <p class="gen-sources" id="sources-status" aria-live="polite"></p>
+      <div class="gen-field">
+        <label for="{{ form.topic.id_for_label }}">{{ form.topic.label }} <span class="gen-optional">optional</span></label>
+        {{ form.topic }}
+        <p class="gen-help">{{ form.topic.help_text }}</p>
+        {% for e in form.topic.errors %}<p class="gen-error">{{ e }}</p>{% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset class="gen-section">
+      <legend><span class="gen-step">2</span> What kind of questions</legend>
+      <div class="gen-grid gen-grid--4">
+        {% for field in form %}{% if field.name == "question_type" or field.name == "difficulty" or field.name == "count" or field.name == "language" %}
+        <div class="gen-field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for e in field.errors %}<p class="gen-error">{{ e }}</p>{% endfor %}
+        </div>
+        {% endif %}{% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="gen-actions">
+      <button type="submit" class="gen-submit" id="generate-btn">
+        <svg class="gen-spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        <svg class="gen-sparkle" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9L12 2Zm7 12 .9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9L19 14Z"/></svg>
+        <span id="generate-label">Generate questions</span>
+      </button>
+      <p class="gen-wait" id="generate-wait" role="status" hidden>Claude is reading the books and writing questions. This usually takes one to three minutes, so please keep this page open.</p>
+    </div>
+  </form>
+
+  <aside class="gen-side">
+    <div class="gen-tip">
+      <h2>How it works</h2>
+      <ol>
+        <li>Upload the textbook for a subject and grade under <strong>Books &amp; knowledge sources</strong>.</li>
+        <li>Choose what to cover and the kind of questions here.</li>
+        <li>Review the drafts: edit, then <strong>approve</strong> or <strong>reject</strong> each one.</li>
+      </ol>
+      {% if can_add_source %}
+      <a class="gen-link" href="{% url 'admin:questionbank_knowledgesource_add' %}">Upload a book →</a>
+      {% endif %}
+    </div>
+    <div class="gen-tip">
+      <h2>Tips for better questions</h2>
+      <ul>
+        <li>Name a chapter in “Topic” to keep questions focused.</li>
+        <li>Generate 10–15 at a time; it's faster and easier to review.</li>
+        <li>Upload books chapter by chapter if a file is over 20 MB.</li>
+      </ul>
+    </div>
+  </aside>
+</div>
+
+{{ sources_by_pair|json_script:"sources-data" }}
+<script>
+  (function () {
+    var counts = JSON.parse(document.getElementById('sources-data').textContent);
+    var subject = document.getElementById('id_subject');
+    var grade = document.getElementById('id_grade');
+    var status = document.getElementById('sources-status');
+
+    function update() {
+      if (!subject.value || !grade.value) { status.textContent = ''; status.className = 'gen-sources'; return; }
+      var n = counts[subject.value + ':' + grade.value] || 0;
+      if (n) {
+        status.textContent = n === 1 ? '1 book available for this subject and grade.' : n + ' books available for this subject and grade.';
+        status.className = 'gen-sources gen-sources--ok';
+      } else {
+        status.textContent = 'No book uploaded for this subject and grade yet. Upload one first.';
+        status.className = 'gen-sources gen-sources--warn';
+      }
+    }
+    subject.addEventListener('change', update);
+    grade.addEventListener('change', update);
+    update();
+
+    var form = document.getElementById('generate-form');
+    form.addEventListener('submit', function () {
+      var btn = document.getElementById('generate-btn');
+      btn.disabled = true;
+      btn.classList.add('is-loading');
+      document.getElementById('generate-label').textContent = 'Generating…';
+      document.getElementById('generate-wait').hidden = false;
+    });
+  })();
+</script>
+{% endblock %}

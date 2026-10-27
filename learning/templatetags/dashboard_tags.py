@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Sum
 
 from learning.models import Course, CourseModule, LearningActivity
+from questionbank.models import KnowledgeSource, Question
 
 register = template.Library()
 
@@ -25,7 +26,17 @@ def dashboard_stats(context):
     request = context["request"]
     stats = {}
 
-    courses = _visible_queryset(request, Course)
+    questions = _visible_queryset(request, Question)
+    if questions is not None:
+        stats["questions_total"] = questions.count()
+        stats["questions_approved"] = questions.filter(status=Question.Status.APPROVED).count()
+        stats["questions_draft"] = questions.filter(status=Question.Status.DRAFT).count()
+
+    sources = _visible_queryset(request, KnowledgeSource)
+    if sources is not None:
+        stats["books_total"] = sources.filter(is_active=True).count()
+
+    courses =_visible_queryset(request, Course)
     if courses is not None:
         stats["courses_total"] = courses.count()
         stats["courses_published"] = courses.filter(status=Course.Status.PUBLISHED).count()
