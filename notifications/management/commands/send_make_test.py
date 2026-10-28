@@ -11,9 +11,7 @@ SAMPLES = {
     },
     "user.welcome": {
         "to": "sample.teacher@example.com", "subject": "Welcome to STS Pulse, Sample",
-        "text": "Hi Sample,
-
-Welcome to STS Pulse...", "html": "<p>Hi Sample,</p><p>Welcome to STS Pulse...</p>",
+        "text": "Hi Sample,\n\nWelcome to STS Pulse...", "html": "<p>Hi Sample,</p><p>Welcome to STS Pulse...</p>",
         "name": "Sample", "username": "sample.teacher", "roles": ["Teacher / Subject Expert"],
         "set_password_url": "http://127.0.0.1:8000/accounts/reset/sample/set-password/",
         "login_url": "http://127.0.0.1:8000/accounts/login/",
