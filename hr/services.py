@@ -10,6 +10,7 @@ from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 
+from notifications.make import leave_approved_data, send_event
 from notifications.models import Notification
 from notifications.services import notify, users_with_perm
 
@@ -95,6 +96,7 @@ def review_leave(leave, *, approve, reviewer, note=""):
                 employee=leave.employee, date=day,
                 defaults={"status": Attendance.Status.ON_LEAVE, "note": f"{leave.leave_type} leave"},
             )
+        send_event("leave.approved", leave_approved_data(leave))
     notify(
         leave.employee.user,
         f"Leave {'approved' if approve else 'rejected'}: {leave.leave_type}, {leave.start_date:%d %b} – {leave.end_date:%d %b}",

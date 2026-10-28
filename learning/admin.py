@@ -4,6 +4,8 @@ from django.contrib.auth.forms import AdminUserCreationForm
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from notifications.make import send_event, user_created_data
+
 from .models import Course, CourseModule, LearningActivity
 from .welcome import send_welcome_email
 
@@ -54,8 +56,9 @@ class UserAdmin(BaseUserAdmin):
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         if not change:
-            # Roles are saved by now, so the email can list them.
+            # Roles are saved by now, so the email and the Make event can list them.
             self._welcome(request, form.instance)
+            send_event("user.created", user_created_data(form.instance, created_by=request.user))
 
     def _welcome(self, request, user):
         if not user.email:

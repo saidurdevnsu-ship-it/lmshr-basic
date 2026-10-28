@@ -153,6 +153,8 @@ QUESTION_GENERATION_MODEL = os.environ.get('QUESTION_GENERATION_MODEL', 'claude-
 # Make.com mailhook: an email address that starts a Make scenario. Kept in .env because anyone who knows it can
 # trigger the scenario.
 MAKE_MAILHOOK_ADDRESS = os.environ.get('MAKE_MAILHOOK_ADDRESS', '')
+# Make.com custom webhook URL. Preferred over the mailhook: no email server needed. Also kept in .env.
+MAKE_WEBHOOK_URL = os.environ.get('MAKE_WEBHOOK_URL', '')
 
 # HR
 HR_COMPANY_NAME = os.environ.get('HR_COMPANY_NAME', 'STS Group')
