@@ -1,8 +1,0 @@
-{% extends "admin/change_list.html" %}
-
-{% block object-tools-items %}
-  {% if perms.hr.manage_hr %}
-  <li><a href="{% url 'admin:hr_payslip_generate' %}" class="addlink">Generate pay slips</a></li>
-  {% endif %}
-  {{ block.super }}
-{% endblock %}

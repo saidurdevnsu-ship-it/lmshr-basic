@@ -5,7 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from hr.admin import is_hr_manager
-from hr.models import Attendance, Employee, LeaveRequest, NOCRequest, Payslip, ReviewStatus
+from hr.models import Attendance, Employee, LeaveRequest, ReviewStatus
 from hr.services import leave_balances, working_days
 
 register = template.Library()
@@ -28,13 +28,7 @@ def hr_dashboard(context):
     if employee:
         data["today_record"] = Attendance.objects.filter(employee=employee, date=today).first()
         data["balances"] = leave_balances(employee, today.year)
-        data["my_pending"] = (
-            LeaveRequest.objects.filter(employee=employee, status=ReviewStatus.PENDING).count()
-            + NOCRequest.objects.filter(employee=employee, status=ReviewStatus.PENDING).count()
-        )
-        data["my_latest_payslip"] = (
-            Payslip.objects.filter(employee=employee, status=Payslip.Status.FINAL).order_by("-year", "-month").first()
-        )
+        data["my_pending"] = LeaveRequest.objects.filter(employee=employee, status=ReviewStatus.PENDING).count()
         data["my_month_attendance"] = list(
             Attendance.objects.filter(employee=employee, date__year=today.year, date__month=today.month)
             .order_by("date")
@@ -52,14 +46,9 @@ def hr_dashboard(context):
             "absent": counts["absent"],
             "unmarked": active.count() - todays.count(),
             "pending_leave": LeaveRequest.objects.filter(status=ReviewStatus.PENDING).count(),
-            "pending_noc": NOCRequest.objects.filter(status=ReviewStatus.PENDING).count(),
-            "draft_payslips": Payslip.objects.filter(status=Payslip.Status.DRAFT).count(),
         }
         data["pending_leave"] = list(
             LeaveRequest.objects.filter(status=ReviewStatus.PENDING)
             .select_related("employee__user", "leave_type").order_by("start_date")[:6]
-        )
-        data["pending_noc"] = list(
-            NOCRequest.objects.filter(status=ReviewStatus.PENDING).select_related("employee__user").order_by("created_at")[:6]
         )
     return data

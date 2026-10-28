@@ -158,9 +158,6 @@ MAKE_WEBHOOK_URL = os.environ.get('MAKE_WEBHOOK_URL', '')
 
 # HR
 HR_COMPANY_NAME = os.environ.get('HR_COMPANY_NAME', 'STS Group')
-HR_COMPANY_ADDRESS = os.environ.get('HR_COMPANY_ADDRESS', 'Dhaka, Bangladesh')
-HR_REFERENCE_PREFIX = 'STS/HR'
-HR_CURRENCY = '৳'
 HR_WEEKEND_DAYS = [4, 5]  # Python weekday numbers: 4 = Friday, 5 = Saturday
 HR_OFFICE_START = '09:00'  # 24-hour local time
 HR_LATE_GRACE_MINUTES = 15

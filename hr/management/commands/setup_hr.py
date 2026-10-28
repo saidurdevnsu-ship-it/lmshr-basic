@@ -10,10 +10,10 @@ DEFAULT_LEAVE_TYPES = [
     ("Unpaid", 0, False),
 ]
 
-# Employee self-service: their own attendance, leave, NOC and pay slips (the admin limits them to their own records).
+# Employee self-service: their own attendance and leave (the admin limits them to their own records).
 EMPLOYEE_PERMISSIONS = [
     "view_employee", "view_attendance", "view_holiday", "view_leavetype",
-    "add_leaverequest", "view_leaverequest", "add_nocrequest", "view_nocrequest", "view_payslip",
+    "add_leaverequest", "view_leaverequest",
 ]
 
 
@@ -37,6 +37,6 @@ class Command(BaseCommand):
 
         employee, _ = Group.objects.get_or_create(name="Employee")
         employee.permissions.add(*hr_perms.filter(codename__in=EMPLOYEE_PERMISSIONS))
-        self.stdout.write("Role: Employee (self-service attendance, leave, NOC, pay slips)")
+        self.stdout.write("Role: Employee (self-service attendance and leave)")
 
         self.stdout.write(self.style.SUCCESS("HR setup complete."))

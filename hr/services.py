@@ -1,8 +1,7 @@
-"""HR business rules: working days, leave balances, approvals, check-in and payroll."""
+"""HR business rules: working days, leave balances, approvals and check-in."""
 
-import calendar
-from datetime import date, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
@@ -14,13 +13,7 @@ from notifications.make import leave_approved_data, send_event
 from notifications.models import Notification
 from notifications.services import notify, users_with_perm
 
-from .models import Attendance, Employee, Holiday, LeaveRequest, LeaveType, NOCRequest, Payslip, ReviewStatus
-
-CENT = Decimal("0.01")
-
-
-def _money(value):
-    return Decimal(value).quantize(CENT, rounding=ROUND_HALF_UP)
+from .models import Attendance, Holiday, LeaveRequest, LeaveType, ReviewStatus
 
 
 # ---------- Calendar ----------
@@ -106,33 +99,10 @@ def review_leave(leave, *, approve, reviewer, note=""):
 
 
 def announce_request(obj, what, summary):
-    """Tell HR managers a leave or NOC request is waiting."""
+    """Tell HR managers a leave request is waiting."""
     notify(users_with_perm("hr.manage_hr"), f"{what} request from {obj.employee.full_name}", body=summary,
            url=reverse(f"admin:hr_{obj._meta.model_name}_change", args=[obj.pk]),
            kind=Notification.Kind.APPROVAL, exclude=obj.employee.user)
-
-
-# ---------- NOC ----------
-
-@transaction.atomic
-def review_noc(noc, *, approve, reviewer, note=""):
-    noc.status = ReviewStatus.APPROVED if approve else ReviewStatus.REJECTED
-    noc.reviewed_by = reviewer
-    noc.reviewed_at = timezone.now()
-    if note:
-        noc.review_note = note
-    if approve and not noc.reference_no:
-        year = timezone.localdate().year
-        count = NOCRequest.objects.filter(reference_no__contains=f"/NOC/{year}/").count() + 1
-        noc.reference_no = f"{settings.HR_REFERENCE_PREFIX}/NOC/{year}/{count:04d}"
-    noc.save()
-    notify(
-        noc.employee.user,
-        f"NOC {'approved' if approve else 'rejected'}: {noc.get_purpose_display()}",
-        body="Your letter is ready to print." if approve else noc.review_note,
-        url=reverse("admin:hr_nocrequest_changelist"),
-        kind=Notification.Kind.SUCCESS if approve else Notification.Kind.WARNING, exclude=reviewer,
-    )
 
 
 # ---------- Attendance ----------
@@ -159,68 +129,3 @@ def check_out(employee):
     record.check_out = now.time().replace(microsecond=0)
     record.save(update_fields=["check_out"])
     return record
-
-
-# ---------- Payroll ----------
-
-def build_payslip(employee, year, month, payslip=None):
-    """Fill a (new or existing draft) payslip from the employee's salary and the month's attendance."""
-    first = date(year, month, 1)
-    last = date(year, month, calendar.monthrange(year, month)[1])
-    workdays = set(working_days(first, last))
-
-    records = Attendance.objects.filter(employee=employee, date__range=(first, last))
-    absent = Decimal("0")
-    for rec in records:
-        if rec.date not in workdays:
-            continue
-        if rec.status == Attendance.Status.ABSENT:
-            absent += 1
-        elif rec.status == Attendance.Status.HALF_DAY:
-            absent += Decimal("0.5")
-
-    unpaid = Decimal("0")
-    for leave in LeaveRequest.objects.filter(
-        employee=employee, status=ReviewStatus.APPROVED, leave_type__is_paid=False,
-        start_date__lte=last, end_date__gte=first,
-    ):
-        unpaid += len([d for d in working_days(max(leave.start_date, first), min(leave.end_date, last))])
-
-    p = payslip or Payslip(employee=employee, year=year, month=month)
-    p.basic_salary = employee.basic_salary
-    p.house_rent = employee.house_rent
-    p.medical_allowance = employee.medical_allowance
-    p.conveyance_allowance = employee.conveyance_allowance
-    p.other_allowance = employee.other_allowance
-    p.days_in_month = last.day
-    p.working_days = len(workdays)
-    p.absent_days = absent
-    p.unpaid_leave_days = unpaid
-
-    gross = employee.gross_salary
-    per_day = gross / p.working_days if p.working_days else Decimal("0")
-    p.absence_deduction = _money(per_day * (absent + unpaid))
-    p.provident_fund = _money(employee.basic_salary * employee.provident_fund_rate / 100)
-    p.tax = _money(employee.monthly_tax)
-    p.recalculate_totals()
-    return p
-
-
-@transaction.atomic
-def generate_payslips(year, month, user):
-    """Create or refresh draft payslips for every active employee. Finalized payslips are never changed."""
-    created = updated = skipped = 0
-    for employee in Employee.objects.filter(is_active=True, joining_date__lte=date(year, month, calendar.monthrange(year, month)[1])):
-        existing = Payslip.objects.filter(employee=employee, year=year, month=month).first()
-        if existing and existing.status == Payslip.Status.FINAL:
-            skipped += 1
-            continue
-        # Refreshing an existing draft keeps any manual "other deduction" HR entered on it.
-        slip = build_payslip(employee, year, month, payslip=existing)
-        if existing:
-            updated += 1
-        else:
-            created += 1
-        slip.generated_by = user
-        slip.save()
-    return created, updated, skipped

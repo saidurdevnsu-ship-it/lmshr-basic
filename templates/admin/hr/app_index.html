@@ -26,7 +26,6 @@
     </div>
     {% if hr.employee %}
     <div class="hr-hero-actions">
-      <a class="dash-btn dash-btn--secondary" href="{% url 'admin:hr_nocrequest_add' %}">Request NOC</a>
       <a class="dash-btn dash-btn--primary" href="{% url 'admin:hr_leaverequest_add' %}">
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z"/></svg>
         Request leave
@@ -51,15 +50,15 @@
     </a>
     <a class="stat" href="{% url 'admin:hr_leaverequest_changelist' %}?status__exact=pending">
       <span class="stat__icon stat__icon--amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></span>
-      <span class="stat__label">Pending requests</span>
-      <span class="stat__value">{{ hr.stats.pending_leave|add:hr.stats.pending_noc }}</span>
-      <span class="stat__meta">{{ hr.stats.pending_leave }} leave · {{ hr.stats.pending_noc }} NOC</span>
+      <span class="stat__label">Pending leave</span>
+      <span class="stat__value">{{ hr.stats.pending_leave }}</span>
+      <span class="stat__meta">Requests waiting for approval</span>
     </a>
-    <a class="stat" href="{% url 'admin:hr_payslip_changelist' %}?status__exact=draft">
-      <span class="stat__icon stat__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 9.5h.01M18 15.5h.01"/></svg></span>
-      <span class="stat__label">Draft pay slips</span>
-      <span class="stat__value">{{ hr.stats.draft_payslips }}</span>
-      <span class="stat__meta">Waiting to be finalized</span>
+    <a class="stat" href="{% url 'admin:hr_attendance_changelist' %}?status__exact=on_leave&date__day={{ hr.today.day }}&date__month={{ hr.today.month }}&date__year={{ hr.today.year }}">
+      <span class="stat__icon stat__icon--violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></span>
+      <span class="stat__label">On leave today</span>
+      <span class="stat__value">{{ hr.stats.on_leave }}</span>
+      <span class="stat__meta">Approved leave covering today</span>
     </a>
   </section>
   {% endif %}
@@ -111,7 +110,7 @@
         {% endif %}
       </section>
       {% elif not hr.is_manager %}
-      <section class="panel"><p class="empty">Your HR profile isn't set up yet. Ask HR to add you as an employee to use attendance, leave, NOC and pay slips.</p></section>
+      <section class="panel"><p class="empty">Your HR profile isn't set up yet. Ask HR to add you as an employee to use attendance and leave.</p></section>
       {% endif %}
 
       {% if hr.is_manager %}
@@ -122,7 +121,7 @@
             <p>Select requests in the list and use Approve or Reject.</p>
           </div>
         </header>
-        {% if hr.pending_leave or hr.pending_noc %}
+        {% if hr.pending_leave %}
         <div class="table-wrap">
           <table class="dash-table">
             <thead><tr><th scope="col">Employee</th><th scope="col">Request</th><th scope="col">When</th><th scope="col"></th></tr></thead>
@@ -135,19 +134,11 @@
                 <td><a class="dash-link" href="{% url 'admin:hr_leaverequest_change' l.pk %}">Review</a></td>
               </tr>
               {% endfor %}
-              {% for n in hr.pending_noc %}
-              <tr>
-                <td>{{ n.employee.full_name }}</td>
-                <td>NOC · {{ n.get_purpose_display }}</td>
-                <td>Asked {{ n.created_at|timesince }} ago</td>
-                <td><a class="dash-link" href="{% url 'admin:hr_nocrequest_change' n.pk %}">Review</a></td>
-              </tr>
-              {% endfor %}
             </tbody>
           </table>
         </div>
         {% else %}
-        <p class="empty">Nothing waiting. All leave and NOC requests are reviewed.</p>
+        <p class="empty">Nothing waiting. All leave requests are reviewed.</p>
         {% endif %}
       </section>
       {% endif %}
@@ -155,7 +146,7 @@
       <section class="panel" aria-labelledby="hr-workspace-title">
         <header class="panel__head">
           <h2 id="hr-workspace-title">HR services</h2>
-          <p>Employees, attendance, leave, NOC, payroll, users and roles.</p>
+          <p>Employees, attendance, leave, users and roles.</p>
         </header>
         <div class="apps">
           {% for app in app_list %}
@@ -169,8 +160,6 @@
                   {% if model.object_name == "Employee" %}<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
                   {% elif model.object_name == "Attendance" %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
                   {% elif model.object_name == "LeaveRequest" or model.object_name == "LeaveType" or model.object_name == "Holiday" %}<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
-                  {% elif model.object_name == "NOCRequest" %}<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6M9 15l2 2 4-4"/>
-                  {% elif model.object_name == "Payslip" %}<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/>
                   {% else %}<path d="M4 7h16M4 12h16M4 17h10"/>{% endif %}
                   </svg>
                 </span>
@@ -222,7 +211,6 @@
         <header class="panel__head"><h2 id="hr-quick-title">HR actions</h2></header>
         <ul class="quick">
           <li><a href="{% url 'admin:hr_mark_attendance' %}"><span>Mark today's attendance</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
-          <li><a href="{% url 'admin:hr_payslip_generate' %}"><span>Generate pay slips</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
           <li><a href="{% url 'admin:hr_employee_add' %}"><span>Add an employee</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
           <li><a href="{% url 'admin:hr_holiday_changelist' %}"><span>Holidays calendar</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
         </ul>
@@ -250,14 +238,9 @@
       </section>
 
       <section class="panel" aria-labelledby="mine-title">
-        <header class="panel__head"><h2 id="mine-title">My requests &amp; pay</h2></header>
+        <header class="panel__head"><h2 id="mine-title">My leave</h2></header>
         <ul class="quick">
           <li><a href="{% url 'admin:hr_leaverequest_changelist' %}"><span>My leave requests{% if hr.my_pending %} <span class="hr-count">{{ hr.my_pending }} pending</span>{% endif %}</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
-          <li><a href="{% url 'admin:hr_nocrequest_changelist' %}"><span>My NOC requests</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
-          {% if hr.my_latest_payslip %}
-          <li><a href="{% url 'admin:hr_payslip_print' hr.my_latest_payslip.pk %}" target="_blank" rel="noopener"><span>Latest pay slip · {{ hr.my_latest_payslip.period_label }}</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
-          {% endif %}
-          <li><a href="{% url 'admin:hr_payslip_changelist' %}"><span>All my pay slips</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
         </ul>
       </section>
       {% endif %}

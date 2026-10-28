@@ -1,4 +1,4 @@
-/* Printable HR documents (pay slip, NOC letter). Light only: these are meant for paper. */
+/* Printable documents (confidential exam paper and answer key). Light only: these are meant for paper. */
 
 @font-face {
   font-family: "Inter";
@@ -76,37 +76,6 @@ body {
 .meta dt { color: #64748b; }
 .meta dd { margin: 0; font-weight: 600; text-align: right; }
 
-.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-table.money { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.money caption { padding: 8px 10px; text-align: left; font-weight: 700; background: #f1f4f9; border-radius: 6px 6px 0 0; }
-table.money td { padding: 7px 10px; border-bottom: 1px solid #eef1f5; }
-table.money td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-table.money tfoot td { font-weight: 700; border-top: 1px solid #cbd5e1; border-bottom: 0; }
-
-.net {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 24px;
-  padding: 16px 20px;
-  border-radius: 10px;
-  background: #eef4ff;
-  color: #1d337d;
-}
-.net span { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-.net strong { font-size: 24px; font-variant-numeric: tabular-nums; }
-
-.note { margin-top: 28px; color: #64748b; font-size: 12px; }
-.signature { display: flex; justify-content: space-between; margin-top: 64px; font-size: 13px; }
-.signature div { width: 200px; padding-top: 8px; border-top: 1px solid #94a3b8; text-align: center; color: #475569; }
-
-.letter { margin-top: 28px; font-size: 14.5px; }
-.letter p { margin: 0 0 14px; }
-.letter .ref { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 13px; color: #334155; }
-.letter .subject { font-weight: 700; text-decoration: underline; }
-.letter .closing { margin-top: 56px; }
-.letter .closing .line { width: 220px; margin-top: 48px; border-top: 1px solid #94a3b8; }
-
 /* Exam paper */
 .paper-instructions { margin: 0 0 20px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
 .paper-instructions p { margin: 4px 0 0; }
@@ -128,7 +97,7 @@ table.money tfoot td { font-weight: 700; border-top: 1px solid #cbd5e1; border-b
 
 @media (max-width: 640px) {
   .sheet { padding: 20px; min-height: 0; }
-  .columns, .meta { grid-template-columns: 1fr; }
+  .meta { grid-template-columns: 1fr; }
 }
 
 @media print {

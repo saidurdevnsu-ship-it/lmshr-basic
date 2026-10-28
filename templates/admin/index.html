@@ -55,16 +55,6 @@
       <span class="stat__meta">Knowledge sources Claude can use</span>
     </a>
     {% endif %}
-    {% if stats.courses_total is not None %}
-    <a class="stat" href="{% url 'admin:learning_course_changelist' %}">
-      <span class="stat__icon stat__icon--violet" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Zm0 0A2 2 0 0 0 6 22h13"/></svg>
-      </span>
-      <span class="stat__label">Courses</span>
-      <span class="stat__value">{{ stats.courses_total }}</span>
-      <span class="stat__meta">{{ stats.courses_published }} published · {{ stats.courses_draft }} draft</span>
-    </a>
-    {% endif %}
   </section>
   {% endif %}
 
@@ -108,7 +98,7 @@
       <section class="panel" aria-labelledby="workspace-title">
         <header class="panel__head">
           <h2 id="workspace-title">Academic workspace</h2>
-          <p>Question bank and courses. Staff, roles and HR are under the HR tab.</p>
+          <p>Question bank, blueprints and the academic calendar. Staff, roles and HR are under the HR tab.</p>
         </header>
         {% if app_list %}
         <div class="apps">
@@ -135,12 +125,6 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
                   {% elif model.object_name == "AcademicEvent" %}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-                  {% elif model.object_name == "Course" %}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Zm0 0A2 2 0 0 0 6 22h13"/></svg>
-                  {% elif model.object_name == "CourseModule" %}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
-                  {% elif model.object_name == "LearningActivity" %}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5v-7Z"/></svg>
                   {% elif model.object_name == "User" %}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
                   {% elif model.object_name == "Group" %}
@@ -176,41 +160,6 @@
         {% endif %}
       </section>
 
-      {% if stats.recent_courses is not None %}
-      <section class="panel" aria-labelledby="recent-courses-title">
-        <header class="panel__head panel__head--row">
-          <div>
-            <h2 id="recent-courses-title">Recently updated courses</h2>
-            <p>The latest changes to course content.</p>
-          </div>
-          <a class="dash-link" href="{% url 'admin:learning_course_changelist' %}">View all</a>
-        </header>
-        {% if stats.recent_courses %}
-        <div class="table-wrap">
-          <table class="dash-table">
-            <thead>
-              <tr><th scope="col">Course</th><th scope="col">Status</th><th scope="col">Author</th><th scope="col">Updated</th></tr>
-            </thead>
-            <tbody>
-              {% for course in stats.recent_courses %}
-              <tr>
-                <td><a href="{% url 'admin:learning_course_change' course.pk %}">{{ course.title }}</a></td>
-                <td><span class="badge badge--{{ course.status }}">{{ course.get_status_display }}</span></td>
-                <td>{% firstof course.created_by.get_full_name course.created_by.get_username %}</td>
-                <td><time datetime="{{ course.updated_at|date:'c' }}">{{ course.updated_at|timesince }} ago</time></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="empty">
-          <p>No courses yet.</p>
-          {% if perms.learning.add_course %}<a class="dash-link" href="{% url 'admin:learning_course_add' %}">Create your first course</a>{% endif %}
-        </div>
-        {% endif %}
-      </section>
-      {% endif %}
     </div>
 
     <aside class="dash-side">
@@ -252,9 +201,6 @@
           {% endif %}
           {% if perms.questionbank.add_knowledgesource %}
           <li><a href="{% url 'admin:questionbank_knowledgesource_add' %}"><span>Upload a book</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
-          {% endif %}
-          {% if perms.learning.add_course %}
-          <li><a href="{% url 'admin:learning_course_add' %}"><span>Create a course</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
           {% endif %}
           {% if user.has_usable_password %}
           <li><a href="{% url 'admin:password_change' %}"><span>Change my password</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>

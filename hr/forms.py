@@ -1,7 +1,6 @@
 from django import forms
-from django.utils import timezone
 
-from .models import Attendance, Employee, LeaveRequest
+from .models import Employee, LeaveRequest
 from .services import validate_leave
 
 DATE_INPUT = forms.DateInput(attrs={"type": "date"})
@@ -30,25 +29,8 @@ class LeaveRequestForm(forms.ModelForm):
         return cleaned
 
 
-class GeneratePayslipsForm(forms.Form):
-    month = forms.TypedChoiceField(coerce=int, choices=[(m, timezone.datetime(2000, m, 1).strftime("%B")) for m in range(1, 13)])
-    year = forms.IntegerField(min_value=2000, max_value=2100)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        today = timezone.localdate()
-        # Default to the previous month: payroll is usually run after a month closes.
-        prev = (today.replace(day=1) - timezone.timedelta(days=1))
-        self.fields["month"].initial = prev.month
-        self.fields["year"].initial = prev.year
-
-
 class MarkAttendanceDateForm(forms.Form):
     date = forms.DateField(widget=DATE_INPUT)
-
-
-def attendance_status_choices():
-    return Attendance.Status.choices
 
 
 def active_employees():
