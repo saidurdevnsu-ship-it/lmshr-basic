@@ -1,7 +1,8 @@
 """Send app events to a Make.com scenario, by webhook (preferred) or mailhook.
 
 Each event is JSON: {"event": "...", "app": "STS Pulse", "sent_at": "...", "data": {...}}, so one scenario can route
-on "event". Never send passwords, leave reasons or exam content here: the data leaves this system.
+on "event". Never send passwords, leave reasons or exam content here: the data leaves this system. The one exception
+is "user.welcome" (learning/welcome.py), which carries the one-time set-password link so Make can email it.
 """
 
 import json

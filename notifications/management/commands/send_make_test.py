@@ -9,6 +9,15 @@ SAMPLES = {
         "full_name": "Sample Teacher", "email": "sample.teacher@example.com",
         "roles": ["Teacher / Subject Expert"], "created_by": "superadmin", "created_at": "2026-10-28T10:00:00+06:00",
     },
+    "user.welcome": {
+        "to": "sample.teacher@example.com", "subject": "Welcome to STS Pulse, Sample",
+        "text": "Hi Sample,
+
+Welcome to STS Pulse...", "html": "<p>Hi Sample,</p><p>Welcome to STS Pulse...</p>",
+        "name": "Sample", "username": "sample.teacher", "roles": ["Teacher / Subject Expert"],
+        "set_password_url": "http://127.0.0.1:8000/accounts/reset/sample/set-password/",
+        "login_url": "http://127.0.0.1:8000/accounts/login/",
+    },
     "leave.approved": {
         "employee_id": "T-000", "name": "Sample Teacher", "email": "sample.teacher@example.com",
         "phone": "+8801700000000", "department": "Academics", "designation": "Teacher",

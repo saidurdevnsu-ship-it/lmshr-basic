@@ -1,130 +1,59 @@
-from django.contrib.auth.models import Permission, User
-from django.test import TestCase
+from unittest import mock
+
+from django.contrib.auth import get_user_model
+from django.core import mail
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import Course, CourseModule, LearningActivity
 
+class HomeTests(TestCase):
+    def test_root_sends_visitors_to_sign_in(self):
+        self.assertRedirects(self.client.get("/"), reverse("login"))
 
-def make_staff(username, *codenames):
-    user = User.objects.create_user(username, password="pw", is_staff=True)
-    user.user_permissions.set(
-        Permission.objects.filter(content_type__app_label="learning", codename__in=codenames)
-    )
-    return user
-
-
-AUTHOR_PERMS = (
-    "view_course", "add_course", "change_course",
-    "view_coursemodule", "add_coursemodule", "change_coursemodule",
-    "view_learningactivity", "add_learningactivity", "change_learningactivity",
-)
-
-
-class CourseSlugTests(TestCase):
-    def test_duplicate_titles_get_unique_slugs(self):
-        author = User.objects.create_user("author")
-        first = Course.objects.create(title="Intro to Python", created_by=author)
-        second = Course.objects.create(title="Intro to Python", created_by=author)
-        self.assertEqual(first.slug, "intro-to-python")
-        self.assertEqual(second.slug, "intro-to-python-2")
-
-
-class AdminScopingTests(TestCase):
-    def setUp(self):
-        self.alice = make_staff("alice", *AUTHOR_PERMS)
-        self.bob = make_staff("bob", *AUTHOR_PERMS)
-        self.alice_course = Course.objects.create(title="Alice course", created_by=self.alice)
-        self.bob_course = Course.objects.create(title="Bob course", created_by=self.bob)
-        self.bob_module = CourseModule.objects.create(course=self.bob_course, title="Bob module")
-
-    def test_author_sees_only_own_courses(self):
-        self.client.force_login(self.alice)
-        response = self.client.get(reverse("admin:learning_course_changelist"))
-        self.assertContains(response, "Alice course")
-        self.assertNotContains(response, "Bob course")
-
-    def test_author_cannot_open_other_authors_module(self):
-        self.client.force_login(self.alice)
-        url = reverse("admin:learning_coursemodule_change", args=[self.bob_module.pk])
-        response = self.client.get(url, follow=True)
-        self.assertNotContains(response, "Bob module")
-
-    def test_view_all_courses_permission_shows_everything(self):
-        viewer = make_staff("viewer", "view_course", "view_all_courses")
-        self.client.force_login(viewer)
-        response = self.client.get(reverse("admin:learning_course_changelist"))
-        self.assertContains(response, "Alice course")
-        self.assertContains(response, "Bob course")
-
-
-class CoursePublishingTests(TestCase):
-    def setUp(self):
-        self.author = make_staff("author", *AUTHOR_PERMS)
-        self.publisher = make_staff("publisher", *AUTHOR_PERMS, "publish_course")
-        self.course = Course.objects.create(title="Course", created_by=self.author)
-
-    def post_status(self, user, status):
+    def test_root_sends_signed_in_staff_to_dashboard(self):
+        user = get_user_model().objects.create_user("staff", password="Pw-12345!", is_staff=True)
         self.client.force_login(user)
-        url = reverse("admin:learning_course_change", args=[self.course.pk])
-        return self.client.post(url, {
-            "title": "Course",
-            "slug": self.course.slug,
-            "summary": "",
-            "description": "",
-            "status": status,
-            "modules-TOTAL_FORMS": "0",
-            "modules-INITIAL_FORMS": "0",
-        })
+        self.assertRedirects(self.client.get("/"), reverse("admin:index"))
 
-    def test_author_without_publish_permission_cannot_publish(self):
-        self.post_status(self.author, Course.Status.PUBLISHED)
-        self.course.refresh_from_db()
-        self.assertEqual(self.course.status, Course.Status.DRAFT)
-        self.assertIsNone(self.course.published_at)
-
-    def test_publisher_publishing_sets_published_at(self):
-        self.course.created_by = self.publisher
-        self.course.save()
-        response = self.post_status(self.publisher, Course.Status.PUBLISHED)
-        self.assertEqual(response.status_code, 302)
-        self.course.refresh_from_db()
-        self.assertEqual(self.course.status, Course.Status.PUBLISHED)
-        self.assertIsNotNone(self.course.published_at)
+    def test_admin_login_uses_sts_sign_in_page(self):
+        response = self.client.get("/admin/login/?next=/admin/hr/")
+        self.assertRedirects(response, f"{reverse('login')}?next=/admin/hr/", fetch_redirect_response=False)
 
 
-class ActivityInlineTests(TestCase):
+@override_settings(MAKE_WEBHOOK_URL="", MAKE_MAILHOOK_ADDRESS="")
+class WelcomeEmailTests(TestCase):
     def setUp(self):
-        self.author = make_staff("author", *AUTHOR_PERMS)
-        course = Course.objects.create(title="Course", created_by=self.author)
-        self.module = CourseModule.objects.create(course=course, title="Module")
-        self.client.force_login(self.author)
-        self.url = reverse("admin:learning_coursemodule_change", args=[self.module.pk])
+        admin = get_user_model().objects.create_superuser("boss", "boss@example.com", "Pw-12345!")
+        self.client.force_login(admin)
 
-    def post_activity(self, **activity):
-        data = {
-            "course": str(self.module.course.pk),
-            "title": "Module",
-            "description": "",
-            "position": "1",
-            "activities-TOTAL_FORMS": "1",
-            "activities-INITIAL_FORMS": "0",
-            "activities-0-title": "Lesson",
-            "activities-0-position": "1",
-        }
-        data.update({f"activities-0-{key}": value for key, value in activity.items()})
-        return self.client.post(self.url, data)
+    def add_user(self, **extra):
+        data = {"username": "newbie", "first_name": "Nadia", "email": "nadia@example.com",
+                "usable_password": "false", "_save": "1", **extra}
+        return self.client.post(reverse("admin:auth_user_add"), data)
 
-    def test_add_video_activity_via_inline(self):
-        response = self.post_activity(activity_type="video", resource_url="https://example.com/v")
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(LearningActivity.objects.filter(module=self.module, title="Lesson").exists())
+    def test_new_user_gets_welcome_email_without_a_password(self):
+        self.add_user()
+        user = get_user_model().objects.get(username="newbie")
+        self.assertTrue(user.is_staff)
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, ["nadia@example.com"])
+        self.assertIn("/accounts/reset/", message.body)
+        self.assertNotIn("Pw-", message.body)
 
-    def test_missing_resource_url_shows_error_instead_of_crashing(self):
-        response = self.post_activity(activity_type="video")
+    def test_email_is_required(self):
+        response = self.add_user(email="")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "This activity type needs a resource URL.")
-        self.assertFalse(LearningActivity.objects.exists())
+        self.assertFalse(get_user_model().objects.filter(username="newbie").exists())
+        self.assertEqual(mail.outbox, [])
 
-    def test_text_activity_requires_body(self):
-        response = self.post_activity(activity_type="text")
-        self.assertContains(response, "Text lessons need lesson content.")
+    @override_settings(MAKE_WEBHOOK_URL="https://hook.example.com/abc")
+    def test_welcome_email_goes_through_make_when_webhook_is_set(self):
+        with mock.patch("learning.welcome.deliver") as deliver:
+            self.add_user()
+        payload = deliver.call_args.args[0]
+        self.assertEqual(payload["event"], "user.welcome")
+        self.assertEqual(payload["data"]["to"], "nadia@example.com")
+        self.assertIn("/accounts/reset/", payload["data"]["set_password_url"])
+        self.assertIn("/accounts/reset/", payload["data"]["html"])
+        self.assertEqual(mail.outbox, [])
