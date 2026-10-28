@@ -1,0 +1,8 @@
+<p class="ai-status {% if claude.configured %}ai-status--ok{% else %}ai-status--off{% endif %}" role="status">
+  <span class="ai-status__dot" aria-hidden="true"></span>
+  {% if claude.configured %}
+    Claude connected · model <code>{{ claude.model }}</code>
+  {% else %}
+    Claude isn't connected yet. Add <code>ANTHROPIC_API_KEY</code> to the <code>.env</code> file on the server, then restart.
+  {% endif %}
+</p>

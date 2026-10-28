@@ -1,4 +1,10 @@
 from django.contrib.auth.views import LoginView
+from django.shortcuts import redirect
+
+
+def home(request):
+    """Site root: the dashboard when signed in, otherwise the sign-in page."""
+    return redirect("admin:index" if request.user.is_authenticated else "login")
 
 
 class RememberMeLoginView(LoginView):

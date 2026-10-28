@@ -1,0 +1,16 @@
+Hi {{ name }},
+
+Welcome to STS Pulse, the People & Learning Hub at {{ company_name }}. Your account is ready.
+
+Username: {{ user.get_username }}
+{% if roles %}Role{{ roles|length|pluralize }}: {{ roles|join:", " }}
+{% endif %}
+1. Set your password (this link works once and expires in {{ link_days }} day{{ link_days|pluralize }}):
+{{ set_password_url }}
+
+2. Then sign in here:
+{{ login_url }}
+
+If you weren't expecting this email, you can ignore it.
+
+STS Pulse · {{ company_name }}

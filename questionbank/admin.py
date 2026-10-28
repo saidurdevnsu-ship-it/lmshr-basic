@@ -14,7 +14,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 
 from . import workflow
-from .ai import GenerationError, generate_final_paper, generate_questions
+from .ai import GenerationError, claude_status, generate_final_paper, generate_questions
 from .forms import GenerateQuestionsForm, KnowledgeSourceForm
 from .models import (
     AcademicEvent, BlueprintItem, FinalPaper, FinalQuestion, Grade, KnowledgeSource, Question, QuestionBlueprint,
@@ -124,6 +124,7 @@ class QuestionAdmin(admin.ModelAdmin):
             "form": form,
             "sources_by_pair": self._source_counts(),
             "can_add_source": request.user.has_perm("questionbank.add_knowledgesource"),
+            "claude": claude_status(),
         }
         return TemplateResponse(request, "admin/questionbank/question/generate.html", context)
 
@@ -357,6 +358,7 @@ class QuestionBlueprintAdmin(admin.ModelAdmin):
                     and (final is None or final.status != FinalPaper.Status.LOCKED),
                     "final": final,
                     "is_controller": can_manage_final(user),
+                    "claude": claude_status(),
                 })
         return super().changeform_view(request, object_id, form_url, extra_context)
 

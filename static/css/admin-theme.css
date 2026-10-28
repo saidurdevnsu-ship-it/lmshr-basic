@@ -261,6 +261,13 @@ textarea:focus-visible {
 .theme-toggle svg.theme-icon-when-dark,
 .theme-toggle svg.theme-icon-when-light { fill: var(--header-link-color); color: var(--header-bg); }
 
+/* ---------- Claude connection status ---------- */
+.ai-status { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; }
+.ai-status code { font-size: 12px; background: none; }
+.ai-status__dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+.ai-status--ok { background: #e6f6ee; color: #11734b; }
+.ai-status--off { background: #fdf1dc; color: #9a5b00; }
+
 /* ---------- Notification bell ---------- */
 .notif { position: relative; margin-right: 6px; }
 .notif__bell {

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Welcome to STS Pulse</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f4f9;font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f4f9;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.08);">
+        <tr><td style="background:#1d337d;background-image:linear-gradient(135deg,#141f4b,#2243c4);padding:28px 32px;">
+          <p style="margin:0;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:#bfd3fe;">STS Pulse · People &amp; Learning Hub</p>
+          <h1 style="margin:8px 0 0;font-size:24px;line-height:1.3;color:#ffffff;">Welcome, {{ name }}!</h1>
+        </td></tr>
+        <tr><td style="padding:28px 32px 8px;font-size:15px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Your account at <strong>{{ company_name }}</strong> is ready. Here are your details:</p>
+          <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;margin:0 0 20px;background:#f6f7fb;border-radius:10px;">
+            <tr><td style="padding:12px 16px;font-size:14px;color:#64748b;width:110px;">Username</td><td style="padding:12px 16px;font-size:14px;font-weight:600;">{{ user.get_username }}</td></tr>
+            {% if roles %}<tr><td style="padding:0 16px 12px;font-size:14px;color:#64748b;">Role{{ roles|length|pluralize }}</td><td style="padding:0 16px 12px;font-size:14px;font-weight:600;">{{ roles|join:", " }}</td></tr>{% endif %}
+          </table>
+          <p style="margin:0 0 8px;"><strong>Step 1.</strong> Choose your password:</p>
+          <p style="margin:0 0 6px;"><a href="{{ set_password_url }}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#2a55e0;color:#ffffff;font-weight:600;text-decoration:none;">Set my password</a></p>
+          <p style="margin:0 0 20px;font-size:13px;color:#64748b;">This link works once and expires in {{ link_days }} day{{ link_days|pluralize }}.</p>
+          <p style="margin:0 0 8px;"><strong>Step 2.</strong> Sign in any time at <a href="{{ login_url }}" style="color:#2a55e0;">{{ login_url }}</a></p>
+        </td></tr>
+        <tr><td style="padding:20px 32px 28px;font-size:12px;line-height:1.5;color:#94a3b8;border-top:1px solid #eef1f5;">
+          If you weren't expecting this email, you can ignore it.<br>STS Pulse · {{ company_name }}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

@@ -17,6 +17,21 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_env_file(path):
+    """Read KEY=value lines from a local .env file (git-ignored) without overriding real environment variables."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding='utf-8-sig').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_env_file(BASE_DIR / '.env')
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
@@ -135,6 +150,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Claude question generation. The API key is read from the ANTHROPIC_API_KEY environment variable.
 QUESTION_GENERATION_MODEL = os.environ.get('QUESTION_GENERATION_MODEL', 'claude-opus-5-5')
 
+# Make.com mailhook: an email address that starts a Make scenario. Kept in .env because anyone who knows it can
+# trigger the scenario.
+MAKE_MAILHOOK_ADDRESS = os.environ.get('MAKE_MAILHOOK_ADDRESS', '')
 
 # HR
 HR_COMPANY_NAME = os.environ.get('HR_COMPANY_NAME', 'STS Group')
@@ -149,13 +167,32 @@ HR_LATE_GRACE_MINUTES = 15
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# Real email is sent once EMAIL_HOST is set in .env; until then emails are printed in the runserver terminal.
+_email_host = os.environ.get('EMAIL_HOST', '')
+if _email_host:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': _email_host,
+                'port': int(os.environ.get('EMAIL_PORT', '587')),
+                'username': os.environ.get('EMAIL_HOST_USER', ''),
+                'password': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+                'use_tls': os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true',
+                'timeout': 20,
+            },
+        },
+    }
+else:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        },
+    }
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'STS Pulse <no-reply@stsgroupbd.com>')
 
 
+LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/admin/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 

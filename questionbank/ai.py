@@ -61,6 +61,13 @@ class GenerationError(Exception):
     """A problem the user can act on; the message is shown in the admin."""
 
 
+def claude_status():
+    """For display: whether an API key is configured and which model is used. Makes no API call."""
+    import os
+
+    return {"configured": bool(os.environ.get("ANTHROPIC_API_KEY")), "model": settings.QUESTION_GENERATION_MODEL}
+
+
 def _source_block(source):
     with source.file.open("rb") as fh:
         data = fh.read()
