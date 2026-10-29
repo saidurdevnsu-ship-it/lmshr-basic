@@ -21,6 +21,9 @@
 {% if final %}
 <section class="wf" aria-label="Final paper">
   <div class="wf-note wf-note--secure">🔒 <strong>Confidential.</strong> Only the exam controller and super admin can see this paper. Teachers and HODs see only that it's prepared.</div>
+  {% if final.check_summary and not final.is_generating %}
+  <div class="wf-note {% if 'flagged' in final.check_summary or "couldn't" in final.check_summary %}wf-note--warn{% else %}wf-note--ok{% endif %}"><strong>Automatic checks:</strong> {{ final.check_summary }}</div>
+  {% endif %}
   {% if final.is_generating %}
   <div class="wf-note wf-note--secure">⏳ <strong>Claude is writing the questions</strong> (started {{ final.generation_started_at|timesince }} ago). You'll get a notification when they're ready; then refresh this page.</div>
   {% elif final.status != "locked" %}

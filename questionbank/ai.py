@@ -10,6 +10,7 @@ from django.conf import settings
 
 from audit.services import Action, record
 
+from .checks import find_similar, normalize
 from .documents import extract_text
 from .models import KnowledgeSource, Question
 
@@ -152,7 +153,18 @@ def generate_questions(*, subject, grade, topic, question_type, difficulty, coun
         for item in items
         if item.get("text", "").strip()
     ]
-    return Question.objects.bulk_create(questions)
+
+    # Drop repeats within this batch; flag questions that closely match one already in the bank.
+    bank = [(pk, normalize(text)) for pk, text in Question.objects.filter(subject=subject, grade=grade)
+            .exclude(status=Question.Status.REJECTED).values_list("pk", "text")]
+    kept, batch = [], []
+    for q in questions:
+        if find_similar(q.text, batch) is not None:
+            continue
+        q.duplicate_of_id = find_similar(q.text, bank)
+        batch.append((len(batch), normalize(q.text)))
+        kept.append(q)
+    return Question.objects.bulk_create(kept)
 
 
 def _ask_claude(system, messages, schema, *, effort="medium"):
@@ -204,7 +216,7 @@ def _ask_claude(system, messages, schema, *, effort="medium"):
     text = "".join(block.text for block in response.content if block.type == "text")
     try:
         data = json.loads(text)
-        data["questions"]
+        data[schema["required"][0]]
     except (ValueError, KeyError, TypeError):
         logger.warning("Unparseable question output (request %s): %r", response._request_id, text[:500])
         raise GenerationError("Claude's reply couldn't be read. Please try again.")
@@ -328,6 +340,8 @@ def generate_final_paper(blueprint, user):
     for q, (section, question_type, marks) in zip(questions, slots):
         q.update(section=section, question_type=question_type, marks=marks)
 
+    notes, summary = check_final_questions(questions, items, documents)
+
     with transaction.atomic():
         paper, _ = FinalPaper.objects.select_for_update().get_or_create(blueprint=blueprint)
         if paper.status == FinalPaper.Status.LOCKED:
@@ -339,13 +353,90 @@ def generate_final_paper(blueprint, user):
                 text=q["text"].strip(), answer=q["answer"].strip(), explanation=q["explanation"].strip(),
                 options=[o.strip() for o in q["options"]] if q["question_type"] == Question.QuestionType.MCQ else [],
                 marks=q["marks"], source_reference=q["source_reference"].strip()[:255],
+                check_notes="\n".join(notes[n]),
             )
             for n, q in enumerate(questions, 1)
         ])
+        paper.check_summary = summary
         paper.model_used = settings.QUESTION_GENERATION_MODEL
         paper.generated_by, paper.generated_at = user, timezone.now()
         paper.save()
     return paper
+
+
+REVIEW_SYSTEM_PROMPT = """\
+You are a second examiner checking a draft school exam paper against the provided materials (textbooks, \
+syllabus, lesson plans). For each question, decide whether it is covered by the materials, whether the given \
+answer is correct and supported by them, and whether the question is ambiguous or has more than one correct answer. \
+Report every question by its number. Keep "issue" empty when the question is fine; otherwise describe the problem \
+in one short sentence for the exam controller.
+"""
+
+REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "reviews": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "number": {"type": "integer"},
+                    "in_syllabus": {"type": "boolean"},
+                    "answer_correct": {"type": "boolean"},
+                    "issue": {"type": "string"},
+                },
+                "required": ["number", "in_syllabus", "answer_correct", "issue"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["reviews"],
+    "additionalProperties": False,
+}
+
+
+def check_final_questions(questions, items, documents):
+    """Flag repeated questions, copied blueprint samples, and (by a second Claude pass over the same, cached
+    materials) questions outside the syllabus or with wrong answers. Returns ({number: [notes]}, summary)."""
+    notes = {n: [] for n in range(1, len(questions) + 1)}
+    seen = []
+    samples = [(item.order, normalize(item.sample_question)) for item in items if item.sample_question.strip()]
+    for n, q in enumerate(questions, 1):
+        earlier = find_similar(q["text"], seen)
+        if earlier is not None:
+            notes[n].append(f"Very similar to question {earlier}.")
+        if find_similar(q["text"], samples) is not None:
+            notes[n].append("Close to a sample question in the blueprint, so its author could predict it.")
+        seen.append((n, normalize(q["text"])))
+
+    listing = []
+    for n, q in enumerate(questions, 1):
+        listing.append(f"{n}. {q['text']}")
+        listing += [f"   {letter}) {o}" for letter, o in zip("ABCDEFGH", q["options"])]
+        listing.append(f"   Answer: {q['answer']}")
+    review_messages = [{"role": "user", "content": [
+        *documents, {"type": "text", "text": "Check this draft paper:\n\n" + "\n".join(listing)}]}]
+    reviewed = True
+    try:
+        for r in _ask_claude(REVIEW_SYSTEM_PROMPT, review_messages, REVIEW_SCHEMA)["reviews"]:
+            if r["number"] not in notes:
+                continue
+            if not r["in_syllabus"]:
+                notes[r["number"]].append("May not be covered by the materials.")
+            if not r["answer_correct"]:
+                notes[r["number"]].append("The answer may be wrong.")
+            if r["issue"].strip():
+                notes[r["number"]].append(r["issue"].strip())
+    except (GenerationError, KeyError, TypeError) as exc:
+        logger.warning("Final paper review pass failed: %s", exc)
+        reviewed = False
+
+    flagged = sum(1 for n in notes if notes[n])
+    summary = (f"{flagged} of {len(questions)} questions flagged; see “Check findings” on each."
+               if flagged else f"All {len(questions)} questions passed the automatic checks.")
+    if not reviewed:
+        summary += " The AI review of syllabus fit and answers couldn't run this time; check those by hand."
+    return notes, summary
 
 
 def start_final_paper(blueprint, user):

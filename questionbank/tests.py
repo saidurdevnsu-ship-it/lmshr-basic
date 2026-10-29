@@ -131,6 +131,55 @@ class DocumentUploadTests(BlueprintTestCase):
         self.assertFalse(KnowledgeSource.objects.filter(title="Lesson 1").exists())
 
 
+class QualityCheckTests(BlueprintTestCase):
+    def generate_questions(self, texts):
+        reply = {"questions": [{"text": t, "options": [], "answer": "A", "explanation": "", "source_reference": ""}
+                               for t in texts]}
+        with mock.patch.object(ai, "_ask_claude", return_value=reply):
+            return ai.generate_questions(subject=self.bp.subject, grade=self.bp.grade, topic="",
+                                         question_type="short", difficulty="easy", count=len(texts),
+                                         language="en", user=self.controller)
+
+    def test_duplicates_are_dropped_within_a_batch_and_flagged_against_the_bank(self):
+        first = self.generate_questions(["What do plants need for photosynthesis?"])[0]
+        created = self.generate_questions([
+            "What do plants need for photosynthesis ?",   # same as the bank question
+            "Name the green pigment in leaves.",
+            "Name the green pigment in leaves",            # repeat within this batch
+        ])
+        self.assertEqual(len(created), 2)
+        self.assertEqual(created[0].duplicate_of_id, first.pk)
+        self.assertIsNone(created[1].duplicate_of_id)
+
+    def test_final_paper_flags_copied_samples_repeats_and_ai_review_findings(self):
+        item = self.bp.items.get(section="A")
+        item.sample_question = "Which gas do plants release during photosynthesis?"
+        item.save()
+        reply = claude_reply(3)
+        reply["questions"][0]["text"] = "Which gas do plants release during photosynthesis?"
+        reply["questions"][2]["text"] = reply["questions"][1]["text"]
+        review = {"reviews": [
+            {"number": 1, "in_syllabus": True, "answer_correct": True, "issue": ""},
+            {"number": 2, "in_syllabus": False, "answer_correct": False, "issue": "Chapter 9 isn't in the books."},
+            {"number": 3, "in_syllabus": True, "answer_correct": True, "issue": ""},
+        ]}
+        with mock.patch.object(ai, "_ask_claude", side_effect=[reply, review]):
+            paper = ai.generate_final_paper(self.bp, self.controller)
+        notes = [q.check_notes for q in paper.questions.all()]
+        self.assertIn("sample question", notes[0])
+        self.assertIn("May not be covered", notes[1])
+        self.assertIn("The answer may be wrong", notes[1])
+        self.assertIn("Chapter 9", notes[1])
+        self.assertIn("Very similar to question 2", notes[2])
+        self.assertTrue(paper.check_summary.startswith("3 of 3 questions flagged"))
+
+    def test_final_paper_is_saved_even_if_the_review_pass_fails(self):
+        with mock.patch.object(ai, "_ask_claude", side_effect=[claude_reply(3), ai.GenerationError("busy")]):
+            paper = ai.generate_final_paper(self.bp, self.controller)
+        self.assertEqual(paper.questions.count(), 3)
+        self.assertIn("couldn't run", paper.check_summary)
+
+
 class MaterialChoiceTests(BlueprintTestCase):
     def setUp(self):
         super().setUp()

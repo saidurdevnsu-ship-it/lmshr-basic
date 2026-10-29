@@ -119,6 +119,8 @@ class Question(models.Model):
     )
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT, db_index=True)
     ai_generated = models.BooleanField(default=False, editable=False)
+    duplicate_of = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+                                     related_name="+", help_text="An existing question this one closely resembles.")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, editable=False
     )
@@ -299,6 +301,7 @@ class FinalPaper(models.Model):
     # Claude writes the paper in the background; these show progress and the last failure on the page.
     generation_started_at = models.DateTimeField(null=True, blank=True, editable=False)
     generation_error = models.TextField(blank=True, editable=False)
+    check_summary = models.TextField("automatic checks", blank=True, editable=False)
 
     GENERATION_TIMEOUT = timedelta(minutes=15)
 
@@ -333,6 +336,8 @@ class FinalQuestion(models.Model):
     explanation = models.TextField(blank=True)
     marks = models.PositiveSmallIntegerField(default=1)
     source_reference = models.CharField(max_length=255, blank=True)
+    check_notes = models.TextField("check findings", blank=True, editable=False,
+                                   help_text="Problems the automatic checks found. Fix the question or ignore them.")
 
     class Meta:
         ordering = ["order", "id"]

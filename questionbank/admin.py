@@ -79,16 +79,26 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     change_list_template = "admin/questionbank/question/change_list.html"
-    list_display = ("__str__", "subject", "grade", "question_type", "difficulty", "status", "ai_generated")
-    list_filter = ("status", "subject", "grade", "question_type", "difficulty", "ai_generated")
+    list_display = ("__str__", "subject", "grade", "question_type", "difficulty", "status", "ai_generated",
+                    "duplicate_flag")
+    list_filter = ("status", "subject", "grade", "question_type", "difficulty", "ai_generated",
+                   ("duplicate_of", admin.EmptyFieldListFilter))
     search_fields = ("text", "answer", "topic", "source_reference")
-    readonly_fields = ("ai_generated", "created_by", "created_at", "updated_at", "options_preview")
+    readonly_fields = ("ai_generated", "duplicate_of", "created_by", "created_at", "updated_at", "options_preview")
     actions = ("approve", "reject")
     fieldsets = (
         (None, {"fields": ("subject", "grade", "topic", "question_type", "difficulty", "status")}),
         ("Question", {"fields": ("text", "options", "options_preview", "answer", "explanation", "source_reference")}),
-        ("History", {"fields": ("ai_generated", "created_by", "created_at", "updated_at"), "classes": ("collapse",)}),
+        ("History", {"fields": ("ai_generated", "duplicate_of", "created_by", "created_at", "updated_at"),
+                     "classes": ("collapse",)}),
     )
+
+    @admin.display(description="Duplicate?")
+    def duplicate_flag(self, obj):
+        if not obj.duplicate_of_id:
+            return ""
+        url = reverse("admin:questionbank_question_change", args=[obj.duplicate_of_id])
+        return format_html('<a href="{}">Like #{}</a>', url, obj.duplicate_of_id)
 
     @admin.display(description="Options")
     def options_preview(self, obj):
@@ -136,11 +146,13 @@ class QuestionAdmin(admin.ModelAdmin):
                 record(request.user, Action.QUESTIONS_GENERATED, request=request,
                        details=f"{len(created)} {data['question_type']} question(s), {data['subject']} / {data['grade']}"
                                + (f", topic: {data['topic']}" if data['topic'] else ""))
+                dups = sum(1 for q in created if q.duplicate_of_id)
                 self.message_user(
                     request,
                     f"Generated {len(created)} {data['subject']} question(s) for {data['grade']}. "
-                    "They're saved as drafts. Review them and approve the ones you want to keep.",
-                    messages.SUCCESS,
+                    "They're saved as drafts. Review them and approve the ones you want to keep."
+                    + (f" {dups} look like questions already in the bank; see the “Duplicate?” column." if dups else ""),
+                    messages.WARNING if dups else messages.SUCCESS,
                 )
                 changelist = reverse("admin:questionbank_question_changelist")
                 query = urlencode({
@@ -437,7 +449,9 @@ class QuestionBlueprintAdmin(admin.ModelAdmin):
 class FinalQuestionInline(admin.StackedInline):
     model = FinalQuestion
     extra = 0
-    fields = (("order", "section", "question_type", "marks"), "text", "options", "answer", "explanation", "source_reference")
+    fields = (("order", "section", "question_type", "marks"), "text", "options", "answer", "explanation", "source_reference",
+              "check_notes")
+    readonly_fields = ("check_notes",)
 
     def _editable(self, request, obj):
         return can_manage_final(request.user) and obj is not None and obj.status != FinalPaper.Status.LOCKED
