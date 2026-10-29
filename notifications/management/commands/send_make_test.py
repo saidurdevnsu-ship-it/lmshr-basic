@@ -16,6 +16,11 @@ SAMPLES = {
         "set_password_url": "http://127.0.0.1:8000/accounts/reset/sample/set-password/",
         "login_url": "http://127.0.0.1:8000/accounts/login/",
     },
+    "user.password_reset": {
+        "to": "sample.teacher@example.com", "subject": "Password reset on 127.0.0.1:8000",
+        "text": "You're receiving this email because you requested a password reset...",
+        "html": "<p>You're receiving this email because you requested a password reset...</p>",
+    },
     "leave.approved": {
         "employee_id": "T-000", "name": "Sample Teacher", "email": "sample.teacher@example.com",
         "phone": "+8801700000000", "department": "Academics", "designation": "Teacher",

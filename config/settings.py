@@ -35,16 +35,30 @@ _load_env_file(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-+vwx^mm!ouv_m)l2a70n0^ba6%%vjgnrr#xk55#*m3t_b&vq-m',
-)
+# Local development: DJANGO_DEBUG=true in .env. On the server leave it out (or false) and set the values below.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'false').lower() == 'true'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    if not DEBUG:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('Set DJANGO_SECRET_KEY in .env (any long random string) when DJANGO_DEBUG is off.')
+    SECRET_KEY = 'django-insecure-+vwx^mm!ouv_m)l2a70n0^ba6%%vjgnrr#xk55#*m3t_b&vq-m'
 
-ALLOWED_HOSTS = []
+# Public address of the site, e.g. https://lms.stsgroupbd.com. Links in emails use it.
+SITE_URL = os.environ.get('SITE_URL', '').rstrip('/')
+
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]
+if SITE_URL:
+    from urllib.parse import urlsplit
+    ALLOWED_HOSTS.append(urlsplit(SITE_URL).hostname)
+    CSRF_TRUSTED_ORIGINS = [SITE_URL]
+if DEBUG:
+    ALLOWED_HOSTS += ['localhost', '127.0.0.1', '[::1]']
+
+if not DEBUG and SITE_URL.startswith('https://'):
+    SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
@@ -140,6 +154,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # `manage.py collectstatic` copies files here for the web server
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Uploaded books / knowledge sources
