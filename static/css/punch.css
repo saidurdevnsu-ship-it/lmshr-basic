@@ -1,0 +1,88 @@
+/* STS LMS — round punch in / punch out button (templates/admin/hr/_punch.html) */
+
+.punch {
+  --punch-in: #15803d;
+  --punch-in-ring: rgb(21 128 61 / 0.18);
+  --punch-out: #c2410c;
+  --punch-out-ring: rgb(194 65 12 / 0.18);
+  --punch-done: #2a55e0;
+  --punch-done-ring: rgb(42 85 224 / 0.15);
+  --punch-leave: #64748b;
+  --punch-leave-ring: rgb(100 116 139 / 0.15);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 20px;
+  padding: 18px 22px;
+  background: var(--sts-surface);
+  border-radius: var(--sts-radius, 12px);
+  box-shadow: var(--sts-shadow);
+}
+.punch--embedded { margin: 0; border-radius: 0; box-shadow: none; background: none; }
+.punch__title { margin: 0; font-size: 15px; font-weight: 650; color: var(--body-loud-color); background: none; padding: 0; text-transform: none; letter-spacing: 0; }
+.punch__date { margin: 2px 0 8px; font-size: 13px; color: var(--body-quiet-color); }
+.punch__line { margin: 2px 0; font-size: 14px; color: var(--body-fg); font-variant-numeric: tabular-nums; }
+.punch__late { color: var(--punch-out); font-weight: 600; }
+.punch form { margin: 0; }
+
+.punch__btn {
+  --c: var(--punch-in);
+  --ring: var(--punch-in-ring);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 120px;
+  height: 120px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c);
+  color: #fff;
+  box-shadow: 0 0 0 8px var(--ring), 0 6px 16px rgb(15 23 42 / 0.18);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s;
+}
+.punch__btn svg { width: 30px; height: 30px; }
+.punch__btn:hover { filter: brightness(1.08); }
+.punch__btn:active { transform: scale(0.96); }
+.punch__btn:focus-visible { outline: 3px solid var(--c); outline-offset: 10px; }
+
+.punch--in .punch__btn { animation: punch-pulse 2.4s ease-in-out infinite; }
+.punch--out .punch__btn { --c: var(--punch-out); --ring: var(--punch-out-ring); }
+.punch--done .punch__btn { --c: var(--punch-done); --ring: var(--punch-done-ring); }
+.punch--leave .punch__btn { --c: var(--punch-leave); --ring: var(--punch-leave-ring); }
+.punch__btn--static { cursor: default; }
+.punch__btn--static:hover { filter: none; }
+.punch__btn--static:active { transform: none; }
+
+.punch__end { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.punch__again {
+  border: 0;
+  background: none;
+  color: var(--link-fg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+@keyframes punch-pulse {
+  0%, 100% { box-shadow: 0 0 0 8px var(--ring), 0 6px 16px rgb(15 23 42 / 0.18); }
+  50% { box-shadow: 0 0 0 14px var(--ring), 0 6px 16px rgb(15 23 42 / 0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .punch--in .punch__btn { animation: none; }
+  .punch__btn { transition: none; }
+}
+
+/* Phones: button first and centred, details below. */
+@media (max-width: 560px) {
+  .punch { flex-direction: column-reverse; text-align: center; }
+}

@@ -1,0 +1,67 @@
+{% comment %}Round punch in / punch out button for the signed-in employee. Rendered by {% punch_button %} (hr_tags).{% endcomment %}
+{% if employee %}
+<section class="punch punch--{{ state }}{% if embedded %} punch--embedded{% endif %}" aria-label="Punch in or out">
+  <div class="punch__info">
+    {% if not embedded %}<h2 class="punch__title">My attendance</h2>{% endif %}
+    <p class="punch__date">{{ today|date:"l, j F" }}{% if not is_workday %} · weekend or holiday{% endif %}</p>
+    {% if state == "out" %}
+      <p class="punch__line">In since <strong>{{ record.check_in|time:"g:i A" }}</strong>{% if record.status == "late" %} · <span class="punch__late">late</span>{% endif %}</p>
+      <p class="punch__line punch__timer" data-since="{{ today|date:'Y-m-d' }}T{{ record.check_in|time:'H:i:s' }}">Working for <strong>—</strong></p>
+    {% elif state == "done" %}
+      <p class="punch__line">{{ record.check_in|time:"g:i A" }} – {{ record.check_out|time:"g:i A" }}{% if hours is not None %} · <strong>{{ hours|floatformat:"-1" }} h</strong>{% endif %}</p>
+    {% elif state == "leave" %}
+      <p class="punch__line">You're on approved leave today.</p>
+    {% else %}
+      <p class="punch__line">Office starts at {{ office_start|time:"g:i A" }}.</p>
+    {% endif %}
+  </div>
+
+  {% if state == "in" %}
+  <form method="post" action="{% url 'admin:hr_check_in' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="punch__btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+      <span>Punch in</span>
+    </button>
+  </form>
+  {% elif state == "out" %}
+  <form method="post" action="{% url 'admin:hr_check_out' %}" onsubmit="return confirm('Punch out now? Your working time for today stops here.')">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="punch__btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      <span>Punch out</span>
+    </button>
+  </form>
+  {% elif state == "done" %}
+  <div class="punch__end">
+    <div class="punch__btn punch__btn--static" role="img" aria-label="Done for today">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+      <span>Done</span>
+    </div>
+    <form method="post" action="{% url 'admin:hr_check_out' %}" onsubmit="return confirm('Change your punch-out time to now?')">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+      <button type="submit" class="punch__again">Update punch-out</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="punch__btn punch__btn--static" role="img" aria-label="On leave">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+    <span>On leave</span>
+  </div>
+  {% endif %}
+</section>
+
+{% if state == "out" %}
+<script>
+  (function () {
+    document.querySelectorAll('.punch__timer[data-since]').forEach(function (el) {
+      var since = new Date(el.dataset.since);
+      var out = el.querySelector('strong');
+      function tick() {
+        var mins = Math.max(0, Math.floor((Date.now() - since) / 60000));
+        out.textContent = Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+      }
+      tick();
+      setInterval(tick, 30000);
+    });
+  })();
+</script>
+{% endif %}
+{% endif %}

@@ -8,6 +8,7 @@ from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from audit.models import AuditEvent
 
@@ -106,10 +107,13 @@ class DepartmentHeadTests(HRTestCase):
         entry = AuditEvent.objects.get(action=AuditEvent.Action.LEAVE_APPROVED)
         self.assertEqual((entry.actor, entry.target_id), (self.head_user, str(team.pk)))
 
-    def test_head_report_covers_own_department_only(self):
-        response = self.client.get(reverse("admin:hr_attendance_report") + "?month=2026-10")
-        self.assertContains(response, "T-001")
-        self.assertNotContains(response, "A-001")
+    def test_head_cannot_see_team_attendance_or_report(self):
+        Attendance.objects.create(employee=self.employee, date=date(2026, 10, 4), status=Attendance.Status.PRESENT)
+        Attendance.objects.create(employee=self.head, date=date(2026, 10, 4), status=Attendance.Status.PRESENT)
+        response = self.client.get(reverse("admin:hr_attendance_changelist"))
+        self.assertContains(response, "T-000")      # their own
+        self.assertNotContains(response, "T-001")   # their team member's
+        self.assertEqual(self.client.get(reverse("admin:hr_attendance_report")).status_code, 403)
 
     def test_head_does_not_see_team_bank_details(self):
         response = self.client.get(reverse("admin:hr_employee_change", args=[self.employee.pk]))
@@ -146,6 +150,43 @@ class ReportTests(HRTestCase):
     def test_employees_cannot_open_the_report(self):
         self.client.force_login(self.employee.user)
         self.assertEqual(self.client.get(reverse("admin:hr_attendance_report")).status_code, 403)
+
+
+class PunchButtonTests(HRTestCase):
+    def dashboard(self):
+        self.client.force_login(self.employee.user)
+        return self.client.get(reverse("admin:index"))
+
+    def test_states_follow_the_day(self):
+        self.assertContains(self.dashboard(), "Punch in")
+        self.client.post(reverse("admin:hr_check_in"), {"next": reverse("admin:index")})
+        response = self.dashboard()
+        self.assertContains(response, "Punch out")
+        self.assertContains(response, "Working for")
+        self.client.post(reverse("admin:hr_check_out"), {"next": reverse("admin:index")})
+        response = self.dashboard()
+        self.assertContains(response, "Update punch-out")
+        self.assertNotContains(response, ">Punch in<")
+
+    def test_on_leave_shows_no_punch(self):
+        Attendance.objects.create(employee=self.employee, date=timezone.localdate(), status=Attendance.Status.ON_LEAVE)
+        response = self.dashboard()
+        self.assertContains(response, "approved leave today")
+        self.assertNotContains(response, reverse("admin:hr_check_in"))
+
+    def test_punch_returns_to_the_page_it_was_pressed_on(self):
+        self.client.force_login(self.employee.user)
+        response = self.client.post(reverse("admin:hr_check_in"), {"next": reverse("admin:index")})
+        self.assertRedirects(response, reverse("admin:index"), fetch_redirect_response=False)
+
+    def test_no_button_without_an_employee_profile(self):
+        self.client.force_login(self.hr)
+        self.assertNotContains(self.client.get(reverse("admin:index")), "punch__btn")
+
+    def test_hr_page_uses_the_same_button(self):
+        self.employee.user.groups.add(Group.objects.get(name="Employee"))
+        self.client.force_login(self.employee.user)
+        self.assertContains(self.client.get(reverse("admin:app_list", args=["hr"])), "punch--embedded")
 
 
 class CheckInTests(HRTestCase):

@@ -213,14 +213,21 @@ class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
         }
         return TemplateResponse(request, "admin/hr/attendance/mark.html", context)
 
+    def get_queryset(self, request):
+        # Attendance is HR's alone: HR sees and edits everyone's; everyone else, department heads included, sees
+        # only their own and records it with the punch button.
+        qs = admin.ModelAdmin.get_queryset(self, request)
+        if is_hr_manager(request.user):
+            return qs
+        employee = own_employee(request)
+        return qs.filter(employee=employee) if employee else qs.none()
+
     def changelist_view(self, request, extra_context=None):
-        can_report = is_hr_manager(request.user) or is_department_head(request.user)
-        return super().changelist_view(request, {**(extra_context or {}), "can_report": can_report})
+        return super().changelist_view(request, {**(extra_context or {}), "can_report": is_hr_manager(request.user)})
 
     def report_view(self, request):
-        """Monthly attendance and leave report: HR sees everyone, department heads their departments."""
-        manager = is_hr_manager(request.user)
-        if not (manager or is_department_head(request.user)):
+        """Monthly attendance and leave report for every employee. HR only."""
+        if not is_hr_manager(request.user):
             raise PermissionDenied
         today = timezone.localdate()
         try:
@@ -229,8 +236,6 @@ class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
         except ValueError:
             report_date = today.replace(day=1)
         employees = active_employees().order_by("department__name", "employee_id")
-        if not manager:
-            employees = employees.filter(department__head=request.user)
         report = reports.monthly_report(list(employees), report_date.year, report_date.month)
 
         if request.GET.get("format") == "csv":
@@ -247,7 +252,6 @@ class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
             "opts": self.model._meta,
             "title": f"Attendance report · {report_date:%B %Y}",
             "report": report,
-            "is_manager": manager,
         }
         return TemplateResponse(request, "admin/hr/attendance/report.html", context)
 

@@ -26,7 +26,7 @@
   <a class="button" href="?month={{ report.first|date:'Y-m' }}&amp;format=csv">Download CSV (Excel)</a>
 </div>
 
-<p class="hr-notice">{{ report.first|date:"F Y" }} · {{ report.working_days }} working day{{ report.working_days|pluralize }} so far{% if not is_manager %} · your department{% endif %}. Hours are counted from check-in to check-out. Leave taken is for the whole of {{ report.first.year }}.</p>
+<p class="hr-notice">{{ report.first|date:"F Y" }} · {{ report.working_days }} working day{{ report.working_days|pluralize }} so far. Hours are counted from check-in to check-out. Leave taken is for the whole of {{ report.first.year }}.</p>
 
 {% if report.rows %}
 <div class="module" style="overflow-x:auto">

@@ -1,7 +1,7 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static log admin_filters dashboard_tags %}
+{% load i18n static log admin_filters dashboard_tags hr_tags %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-dashboard.css' %}"><link rel="stylesheet" href="{% static 'css/admin-papers.css' %}">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-dashboard.css' %}"><link rel="stylesheet" href="{% static 'css/admin-papers.css' %}"><link rel="stylesheet" href="{% static 'css/punch.css' %}">{% endblock %}
 
 {% block coltype %}colM{% endblock %}
 
@@ -32,6 +32,8 @@
     </a>
     {% endif %}
   </section>
+
+  {% punch_button %}
 
   {% if stats %}
   <section class="dash-stats" aria-label="Summary">

@@ -1,7 +1,7 @@
 {% extends "admin/base_site.html" %}
 {% load static hr_tags %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-dashboard.css' %}"><link rel="stylesheet" href="{% static 'css/admin-hr.css' %}">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-dashboard.css' %}"><link rel="stylesheet" href="{% static 'css/admin-hr.css' %}"><link rel="stylesheet" href="{% static 'css/punch.css' %}">{% endblock %}
 
 {% block bodyclass %}{{ block.super }} sts-dashboard sts-hr app-hr{% endblock %}
 
@@ -71,36 +71,11 @@
         <header class="panel__head panel__head--row">
           <div>
             <h2 id="today-title">My attendance today</h2>
-            <p>{% if hr.is_workday %}Office starts at {{ hr.office_start|time:"g:i A" }}. Check in when you arrive and check out when you leave.{% else %}Today is a weekend or holiday.{% endif %}</p>
+            <p>Punch in when you arrive and punch out when you leave.</p>
           </div>
           <a class="dash-link" href="{% url 'admin:hr_attendance_changelist' %}">My history</a>
         </header>
-        <div class="hr-today">
-          <div class="hr-today__status">
-            {% if hr.today_record %}
-              <span class="hr-badge hr-badge--{{ hr.today_record.status }}">{{ hr.today_record.get_status_display }}</span>
-              <dl class="hr-times">
-                <div><dt>Check in</dt><dd>{{ hr.today_record.check_in|time:"g:i A"|default:"—" }}</dd></div>
-                <div><dt>Check out</dt><dd>{{ hr.today_record.check_out|time:"g:i A"|default:"—" }}</dd></div>
-              </dl>
-            {% else %}
-              <span class="hr-badge hr-badge--cancelled">Not checked in</span>
-            {% endif %}
-          </div>
-          {% if hr.is_workday %}
-          <div class="hr-today__actions">
-            {% if not hr.today_record or not hr.today_record.check_in and hr.today_record.status != "on_leave" %}
-            <form method="post" action="{% url 'admin:hr_check_in' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ hr_home }}">
-              <button type="submit" class="hr-btn hr-btn--primary">Check in</button>
-            </form>
-            {% elif hr.today_record.check_in and not hr.today_record.check_out %}
-            <form method="post" action="{% url 'admin:hr_check_out' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ hr_home }}">
-              <button type="submit" class="hr-btn">Check out</button>
-            </form>
-            {% endif %}
-          </div>
-          {% endif %}
-        </div>
+        {% punch_button embedded=True %}
         {% if hr.my_month_attendance %}
         <div class="hr-month" aria-label="This month">
           {% for a in hr.my_month_attendance %}
@@ -118,7 +93,6 @@
         <header class="panel__head panel__head--row">
           <div>
             <h2 id="approvals-title">{% if hr.is_manager %}Waiting for approval{% else %}Your team's leave requests{% endif %}</h2>
-            {% if hr.is_head %}<p><a class="dash-link" href="{% url 'admin:hr_attendance_report' %}">Team attendance report</a></p>{% endif %}
             <p>Select requests in the list and use Approve or Reject.</p>
           </div>
         </header>
