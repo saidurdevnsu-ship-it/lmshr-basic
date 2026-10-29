@@ -89,7 +89,7 @@
           </div>
           {% if hr.is_workday %}
           <div class="hr-today__actions">
-            {% if not hr.today_record %}
+            {% if not hr.today_record or not hr.today_record.check_in and hr.today_record.status != "on_leave" %}
             <form method="post" action="{% url 'admin:hr_check_in' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ hr_home }}">
               <button type="submit" class="hr-btn hr-btn--primary">Check in</button>
             </form>

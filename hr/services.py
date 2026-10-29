@@ -1,11 +1,11 @@
 """HR business rules: working days, leave balances, approvals and check-in."""
 
-from datetime import datetime, timedelta
+from collections import Counter
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -29,12 +29,24 @@ def working_days(start, end):
     return days
 
 
+def days_by_year(start, end):
+    """Working days from start to end, counted per calendar year: {2026: 2, 2027: 1}."""
+    return Counter(day.year for day in working_days(start, end))
+
+
 # ---------- Leave ----------
 
+class LeaveError(Exception):
+    pass
+
+
 def leave_used(employee, leave_type, year):
-    return LeaveRequest.objects.filter(
-        employee=employee, leave_type=leave_type, status=ReviewStatus.APPROVED, start_date__year=year
-    ).aggregate(total=Sum("days"))["total"] or Decimal("0")
+    """Approved working days of this leave type that fall in the year, so leave over New Year counts in both years."""
+    first, last = date(year, 1, 1), date(year, 12, 31)
+    approved = LeaveRequest.objects.filter(
+        employee=employee, leave_type=leave_type, status=ReviewStatus.APPROVED, start_date__lte=last, end_date__gte=first
+    )
+    return Decimal(sum(len(working_days(max(l.start_date, first), min(l.end_date, last))) for l in approved))
 
 
 def leave_balances(employee, year=None):
@@ -51,11 +63,24 @@ def leave_balances(employee, year=None):
     return rows
 
 
+def balance_problems(leave):
+    """Years in which this request needs more days than are left of the yearly allowance."""
+    lt = leave.leave_type
+    if not lt.days_per_year:
+        return []
+    problems = []
+    for year, needed in sorted(days_by_year(leave.start_date, leave.end_date).items()):
+        remaining = lt.days_per_year - leave_used(leave.employee, lt, year)
+        if needed > remaining:
+            problems.append(f"Only {remaining:g} day(s) of {lt.name} leave are left in {year}, "
+                            f"but this request needs {needed}.")
+    return problems
+
+
 def validate_leave(leave):
     """Return a list of problems with a leave request (empty if it can be submitted)."""
     problems = []
-    days = working_days(leave.start_date, leave.end_date)
-    if not days:
+    if not working_days(leave.start_date, leave.end_date):
         problems.append("The selected dates are all weekends or holidays, so no leave is needed.")
     overlapping = LeaveRequest.objects.filter(
         employee=leave.employee,
@@ -65,18 +90,17 @@ def validate_leave(leave):
     ).exclude(pk=leave.pk)
     if overlapping.exists():
         problems.append("These dates overlap another pending or approved leave request.")
-    lt = leave.leave_type
-    if lt.days_per_year:
-        remaining = lt.days_per_year - leave_used(leave.employee, lt, leave.start_date.year)
-        if len(days) > remaining:
-            problems.append(
-                f"Only {remaining:g} day(s) of {lt.name} leave are left this year, but this request needs {len(days)}."
-            )
-    return problems
+    return problems + balance_problems(leave)
 
 
 @transaction.atomic
 def review_leave(leave, *, approve, reviewer, note=""):
+    """Approve or reject a pending request. Approval checks the balance again, since other leave may have been
+    approved since this request was made, and raises LeaveError if it no longer fits."""
+    if approve:
+        problems = balance_problems(leave)
+        if problems:
+            raise LeaveError(" ".join(problems))
     leave.status = ReviewStatus.APPROVED if approve else ReviewStatus.REJECTED
     leave.reviewed_by = reviewer
     leave.reviewed_at = timezone.now()
@@ -98,6 +122,24 @@ def review_leave(leave, *, approve, reviewer, note=""):
     )
 
 
+@transaction.atomic
+def cancel_leave(leave, by):
+    """Cancel a pending or approved request. For approved leave, the "on leave" attendance it created is removed,
+    so the days go back into the balance."""
+    was_approved = leave.status == ReviewStatus.APPROVED
+    leave.status = ReviewStatus.CANCELLED
+    leave.save(update_fields=["status"])
+    if was_approved:
+        Attendance.objects.filter(
+            employee=leave.employee, date__range=(leave.start_date, leave.end_date), status=Attendance.Status.ON_LEAVE
+        ).delete()
+        notify(leave.employee.user,
+               f"Leave cancelled: {leave.leave_type}, {leave.start_date:%d %b} – {leave.end_date:%d %b}",
+               body="HR cancelled this approved leave. The days are back in your balance.",
+               url=reverse("admin:hr_leaverequest_change", args=[leave.pk]),
+               kind=Notification.Kind.WARNING, exclude=by)
+
+
 def announce_request(obj, what, summary):
     """Tell HR managers a leave request is waiting."""
     notify(users_with_perm("hr.manage_hr"), f"{what} request from {obj.employee.full_name}", body=summary,
@@ -108,17 +150,30 @@ def announce_request(obj, what, summary):
 # ---------- Attendance ----------
 
 def check_in(employee):
+    """Record today's arrival. Returns (record, outcome): "checked_in", "already" or "on_leave".
+
+    If HR marked the day before the employee arrived, the check-in time is still recorded, and "absent" becomes
+    present or late.
+    """
     now = timezone.localtime()
     office_start = datetime.strptime(settings.HR_OFFICE_START, "%H:%M").time()
     late_after = (datetime.combine(now.date(), office_start) + timedelta(minutes=settings.HR_LATE_GRACE_MINUTES)).time()
+    arrived = now.time().replace(microsecond=0)
+    status = Attendance.Status.LATE if now.time() > late_after else Attendance.Status.PRESENT
     record, created = Attendance.objects.get_or_create(
-        employee=employee, date=now.date(),
-        defaults={
-            "check_in": now.time().replace(microsecond=0),
-            "status": Attendance.Status.LATE if now.time() > late_after else Attendance.Status.PRESENT,
-        },
+        employee=employee, date=now.date(), defaults={"check_in": arrived, "status": status},
     )
-    return record, created
+    if created:
+        return record, "checked_in"
+    if record.check_in:
+        return record, "already"
+    if record.status == Attendance.Status.ON_LEAVE:
+        return record, "on_leave"
+    record.check_in = arrived
+    if record.status == Attendance.Status.ABSENT:
+        record.status = status
+    record.save(update_fields=["check_in", "status"])
+    return record, "checked_in"
 
 
 def check_out(employee):

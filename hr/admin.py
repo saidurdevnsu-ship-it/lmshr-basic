@@ -134,10 +134,13 @@ class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
         if employee is None:
             self.message_user(request, "Your HR profile isn't set up yet. Ask HR to add you as an employee.", messages.ERROR)
             return self._back(request)
-        record, created = services.check_in(employee)
-        if created:
+        record, outcome = services.check_in(employee)
+        if outcome == "checked_in":
             late = " You're marked late today." if record.status == Attendance.Status.LATE else ""
             self.message_user(request, f"Checked in at {record.check_in:%I:%M %p}.{late}", messages.SUCCESS)
+        elif outcome == "on_leave":
+            self.message_user(request, "You're on leave today, so there's no check-in. If you're working, ask HR "
+                                       "to cancel the leave.", messages.WARNING)
         else:
             self.message_user(request, "You've already checked in today.", messages.INFO)
         return self._back(request)
@@ -255,9 +258,13 @@ class LeaveRequestAdmin(OwnRecordsMixin, admin.ModelAdmin):
 
     def _review(self, request, queryset, approve):
         done = 0
-        for leave in queryset.filter(status=ReviewStatus.PENDING).select_related("employee", "leave_type"):
-            services.review_leave(leave, approve=approve, reviewer=request.user)
-            done += 1
+        for leave in queryset.filter(status=ReviewStatus.PENDING).select_related("employee__user", "leave_type"):
+            try:
+                services.review_leave(leave, approve=approve, reviewer=request.user)
+            except services.LeaveError as exc:
+                self.message_user(request, f"Not approved: {leave}. {exc}", messages.ERROR)
+            else:
+                done += 1
         verb = "Approved" if approve else "Rejected"
         self.message_user(request, f"{verb} {done} pending leave request(s).", messages.SUCCESS if done else messages.WARNING)
 
@@ -269,7 +276,12 @@ class LeaveRequestAdmin(OwnRecordsMixin, admin.ModelAdmin):
     def reject_selected(self, request, queryset):
         self._review(request, queryset, approve=False)
 
-    @admin.action(description="Cancel selected (pending only)")
+    @admin.action(description="Cancel selected leave")
     def cancel_selected(self, request, queryset):
-        n = queryset.filter(status=ReviewStatus.PENDING).update(status=ReviewStatus.CANCELLED)
-        self.message_user(request, f"Cancelled {n} pending request(s).", messages.SUCCESS if n else messages.WARNING)
+        # Employees can withdraw pending requests; HR can also cancel approved leave.
+        statuses = [ReviewStatus.PENDING] + ([ReviewStatus.APPROVED] if is_hr_manager(request.user) else [])
+        n = 0
+        for leave in queryset.filter(status__in=statuses).select_related("employee__user", "leave_type"):
+            services.cancel_leave(leave, by=request.user)
+            n += 1
+        self.message_user(request, f"Cancelled {n} leave request(s).", messages.SUCCESS if n else messages.WARNING)
