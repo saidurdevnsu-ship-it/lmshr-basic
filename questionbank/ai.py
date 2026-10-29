@@ -113,9 +113,13 @@ def _build_request(sources, *, subject, grade, topic, question_type, difficulty,
     return [{"role": "user", "content": [*documents, {"type": "text", "text": instructions}]}]
 
 
-def generate_questions(*, subject, grade, topic, question_type, difficulty, count, language, user):
-    """Ask Claude for questions and save them as drafts. Returns the saved Question objects."""
-    sources = list(KnowledgeSource.objects.filter(subject=subject, grade=grade, is_active=True))
+def generate_questions(*, subject, grade, topic, question_type, difficulty, count, language, user, sources=None):
+    """Ask Claude for questions and save them as drafts. Returns the saved Question objects.
+
+    sources limits Claude to chosen materials (e.g. some chapters); by default it reads all active ones.
+    """
+    sources = list(sources) if sources else list(
+        KnowledgeSource.objects.filter(subject=subject, grade=grade, is_active=True))
     if not sources:
         raise GenerationError(
             f"No active books are uploaded for {subject} / {grade}. "
@@ -277,6 +281,13 @@ def _blueprint_text(bp, items):
     return "\n".join(lines)
 
 
+def blueprint_materials(blueprint):
+    """The materials the blueprint names, or every active material for its subject and grade if it names none."""
+    active = KnowledgeSource.objects.filter(subject=blueprint.subject, grade=blueprint.grade, is_active=True)
+    chosen = active.filter(pk__in=blueprint.materials.values("pk"))
+    return chosen if blueprint.materials.exists() else active
+
+
 def generate_final_paper(blueprint, user):
     """Write (or rewrite) the confidential final paper for an approved blueprint. Returns the FinalPaper."""
     from django.db import transaction
@@ -287,7 +298,7 @@ def generate_final_paper(blueprint, user):
     items = list(blueprint.items.all())
     if not items:
         raise GenerationError("This blueprint has no sections yet.")
-    sources = list(KnowledgeSource.objects.filter(subject=blueprint.subject, grade=blueprint.grade, is_active=True))
+    sources = list(blueprint_materials(blueprint))
     if not sources:
         raise GenerationError(
             f"No active books are uploaded for {blueprint.subject} / {blueprint.grade}. "

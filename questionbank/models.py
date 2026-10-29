@@ -213,6 +213,11 @@ class QuestionBlueprint(models.Model):
         validators=[FileExtensionValidator(DOCUMENT_EXTENSIONS)],
         help_text="Optional. A past or sample paper (PDF, Word, TXT or Markdown) showing the style you want.",
     )
+    materials = models.ManyToManyField(
+        KnowledgeSource, blank=True, related_name="blueprints", verbose_name="materials to use",
+        help_text="Optional. The chapters, syllabus or files the exam covers. Leave empty to use every active "
+                  "material for the subject and grade.",
+    )
     instructions = models.TextField("instructions for candidates", blank=True,
                                     default="Answer all questions. Write clearly.")
     guidance = models.TextField("guidance for the AI", blank=True,

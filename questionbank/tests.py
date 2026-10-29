@@ -18,6 +18,7 @@ from audit.models import AuditEvent
 from notifications.models import Notification
 
 from . import ai, workflow
+from .forms import GenerateQuestionsForm
 from .models import (
     AcademicEvent, BlueprintItem, FinalPaper, Grade, KnowledgeSource, QuestionBlueprint, Subject,
 )
@@ -128,6 +129,48 @@ class DocumentUploadTests(BlueprintTestCase):
         response = self.upload("broken.docx", b"not really a word file")
         self.assertContains(response, "couldn")
         self.assertFalse(KnowledgeSource.objects.filter(title="Lesson 1").exists())
+
+
+class MaterialChoiceTests(BlueprintTestCase):
+    def setUp(self):
+        super().setUp()
+        self.book = KnowledgeSource.objects.get(title="Book")
+        self.chapter = KnowledgeSource.objects.create(
+            subject=self.bp.subject, grade=self.bp.grade, title="Chapter 5", chapter="Chapter 5",
+            file=SimpleUploadedFile("ch5.txt", b"Respiration releases energy."))
+
+    @staticmethod
+    def sent_titles(ask):
+        content = ask.call_args.args[1][0]["content"]
+        return [block["title"] for block in content if block["type"] == "document"]
+
+    def test_only_chosen_materials_reach_claude(self):
+        with mock.patch.object(ai, "_ask_claude", return_value=claude_reply(1)) as ask:
+            ai.generate_questions(subject=self.bp.subject, grade=self.bp.grade, topic="", question_type="short",
+                                  difficulty="easy", count=1, language="en", user=self.controller,
+                                  sources=[self.chapter])
+        self.assertEqual(self.sent_titles(ask), ["Textbook: Chapter 5 · Chapter 5"])
+
+    def test_blueprint_materials_limit_the_final_paper(self):
+        self.bp.materials.add(self.chapter)
+        with mock.patch.object(ai, "_ask_claude", return_value=claude_reply(3)) as ask:
+            ai.generate_final_paper(self.bp, self.controller)
+        self.assertEqual(self.sent_titles(ask), ["Textbook: Chapter 5 · Chapter 5"])
+
+    def test_generate_page_lists_materials_with_their_subject_and_grade(self):
+        self.client.force_login(self.controller)
+        response = self.client.get(reverse("admin:questionbank_question_generate"))
+        self.assertContains(response, f'data-pair="{self.bp.subject.pk}:{self.bp.grade.pk}"', count=2)
+
+    def test_material_for_another_subject_is_refused(self):
+        other = KnowledgeSource.objects.create(
+            subject=Subject.objects.create(name="History"), grade=self.bp.grade, title="History book",
+            file=SimpleUploadedFile("h.txt", b"Kings"))
+        form = GenerateQuestionsForm(data={
+            "subject": self.bp.subject.pk, "grade": self.bp.grade.pk, "question_type": "short",
+            "difficulty": "easy", "count": 1, "language": "en", "sources": [other.pk]})
+        self.assertFalse(form.is_valid())
+        self.assertIn("isn't for Science / Class 8", form.non_field_errors()[0])
 
 
 class ExportTests(BlueprintTestCase):

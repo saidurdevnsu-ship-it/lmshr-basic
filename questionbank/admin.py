@@ -16,7 +16,7 @@ from audit.services import Action, record
 
 from . import export, workflow
 from .ai import GenerationError, claude_status, generate_questions, start_final_paper
-from .forms import GenerateQuestionsForm, KnowledgeSourceForm
+from .forms import BlueprintForm, GenerateQuestionsForm, KnowledgeSourceForm
 from .models import (
     AcademicEvent, BlueprintItem, FinalPaper, FinalQuestion, Grade, KnowledgeSource, Question, QuestionBlueprint,
     Subject,
@@ -279,11 +279,13 @@ class BlueprintItemInline(admin.TabularInline):
 @admin.register(QuestionBlueprint)
 class QuestionBlueprintAdmin(admin.ModelAdmin):
     change_form_template = "admin/questionbank/questionblueprint/change_form.html"
+    form = BlueprintForm
     list_display = ("title", "subject", "grade", "assigned_to", "due_display", "marks_display", "status_badge")
     list_filter = ("status", "subject", "grade", "exam")
     search_fields = ("title", "assigned_to__username", "assigned_to__first_name", "assigned_to__last_name")
     list_select_related = ("subject", "grade", "assigned_to")
     autocomplete_fields = ("assigned_to",)
+    filter_horizontal = ("materials",)
     inlines = (BlueprintItemInline,)
 
     @staticmethod
@@ -310,7 +312,7 @@ class QuestionBlueprintAdmin(admin.ModelAdmin):
             main.insert(4, "assigned_to")
         sets = [
             (None, {"fields": main}),
-            ("Samples & guidance", {"fields": ["sample_file", "instructions", "guidance"],
+            ("Samples & guidance", {"fields": ["materials", "sample_file", "instructions", "guidance"],
                                     "description": "Add each section below with an optional sample question. Claude "
                                                    "writes new questions in that style; samples are never reused."}),
         ]
@@ -325,7 +327,7 @@ class QuestionBlueprintAdmin(admin.ModelAdmin):
             return always
         if not self.is_editable(request.user, obj):
             return always + ["title", "subject", "grade", "exam", "assigned_to", "due_date", "duration_minutes",
-                             "language", "sample_file", "instructions", "guidance"]
+                             "language", "materials", "sample_file", "instructions", "guidance"]
         return always + ([] if can_review(request.user) else ["assigned_to"])
 
     def has_change_permission(self, request, obj=None):

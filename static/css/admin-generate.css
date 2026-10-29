@@ -67,6 +67,9 @@
 .gen-sources:empty { display: none; }
 .gen-sources--ok { color: #11734b; }
 .gen-sources--warn { color: #9a5b00; }
+.gen-materials > div { display: grid; gap: 6px; margin-top: 6px; }
+.gen-materials label { display: flex; gap: 8px; align-items: center; font-weight: normal; }
+.gen-materials [hidden] { display: none; }
 
 .gen-alert {
   display: flex;

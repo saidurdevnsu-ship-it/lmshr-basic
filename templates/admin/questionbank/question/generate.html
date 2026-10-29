@@ -46,6 +46,12 @@
         {% endif %}{% endfor %}
       </div>
       <p class="gen-sources" id="sources-status" aria-live="polite"></p>
+      <div class="gen-field" id="materials-field" hidden>
+        <label>{{ form.sources.label }} <span class="gen-optional">optional</span></label>
+        <div class="gen-materials">{{ form.sources }}</div>
+        <p class="gen-help">{{ form.sources.help_text }}</p>
+        {% for e in form.sources.errors %}<p class="gen-error">{{ e }}</p>{% endfor %}
+      </div>
       <div class="gen-field">
         <label for="{{ form.topic.id_for_label }}">{{ form.topic.label }} <span class="gen-optional">optional</span></label>
         {{ form.topic }}
@@ -92,7 +98,7 @@
     <div class="gen-tip">
       <h2>Tips for better questions</h2>
       <ul>
-        <li>Name a chapter in “Topic” to keep questions focused.</li>
+        <li>Tick only the chapters you want, or name one in “Topic”, to keep questions focused.</li>
         <li>Generate 10–15 at a time; it's faster and easier to review.</li>
         <li>Upload books chapter by chapter if a file is over 20 MB.</li>
       </ul>
@@ -108,7 +114,20 @@
     var grade = document.getElementById('id_grade');
     var status = document.getElementById('sources-status');
 
+    var materials = document.querySelectorAll('#materials-field input[data-pair]');
+
+    function showMaterials(pair) {
+      var shown = 0;
+      materials.forEach(function (box) {
+        var match = box.dataset.pair === pair;
+        box.closest('div').hidden = !match;
+        if (!match) { box.checked = false; } else { shown++; }
+      });
+      document.getElementById('materials-field').hidden = shown < 2;  // nothing to choose with one file
+    }
+
     function update() {
+      showMaterials(subject.value + ':' + grade.value);
       if (!subject.value || !grade.value) { status.textContent = ''; status.className = 'gen-sources'; return; }
       var n = counts[subject.value + ':' + grade.value] || 0;
       if (n) {
