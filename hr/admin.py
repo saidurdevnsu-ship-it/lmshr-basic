@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -21,19 +22,26 @@ def own_employee(request):
     return getattr(request.user, "employee", None)
 
 
+def is_department_head(user):
+    return Department.objects.filter(head=user).exists()
+
+
 class OwnRecordsMixin:
-    """HR managers see everyone; other staff only see records belonging to their own employee profile."""
+    """HR managers see everyone; department heads see their departments' records and their own; other staff only
+    see records belonging to their own employee profile."""
 
     employee_lookup = "employee"
+    department_lookup = "employee__department"
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if is_hr_manager(request.user):
             return qs
+        visible = Q(**{f"{self.department_lookup}__head": request.user})
         employee = own_employee(request)
-        if employee is None:
-            return qs.none()
-        return qs.filter(**{self.employee_lookup: employee})
+        if employee is not None:
+            visible |= Q(**{self.employee_lookup: employee.pk})
+        return qs.filter(visible)
 
     def get_list_filter(self, request):
         filters = super().get_list_filter(request)
@@ -46,7 +54,9 @@ class OwnRecordsMixin:
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ("name", "head")
     search_fields = ("name",)
+    autocomplete_fields = ("head",)
 
 
 @admin.register(Designation)
@@ -70,23 +80,25 @@ class LeaveTypeAdmin(admin.ModelAdmin):
 @admin.register(Employee)
 class EmployeeAdmin(OwnRecordsMixin, admin.ModelAdmin):
     employee_lookup = "pk"
-    list_display = ("employee_id", "full_name", "department", "designation", "joining_date", "is_active")
+    department_lookup = "department"
+    list_display = ("employee_id", "full_name", "department", "designation", "reports_to", "joining_date", "is_active")
     list_filter = ("is_active", "department", "designation")
     search_fields = ("employee_id", "user__username", "user__first_name", "user__last_name", "phone")
-    autocomplete_fields = ("user",)
-    list_select_related = ("user", "department", "designation")
+    autocomplete_fields = ("user", "reports_to")
+    list_select_related = ("user", "department", "designation", "reports_to__user")
     fieldsets = (
-        (None, {"fields": ("user", "employee_id", "department", "designation", "joining_date", "is_active")}),
+        (None, {"fields": ("user", "employee_id", "department", "designation", "reports_to", "joining_date",
+                           "is_active")}),
         ("Contact", {"fields": ("phone", "address")}),
         ("Bank", {"fields": ("bank_name", "bank_account")}),
     )
 
-    def get_queryset(self, request):
-        qs = admin.ModelAdmin.get_queryset(self, request)
-        if is_hr_manager(request.user):
-            return qs
-        employee = own_employee(request)
-        return qs.filter(pk=employee.pk) if employee else qs.none()
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is not None and not is_hr_manager(request.user) and obj.user_id != request.user.pk:
+            # Department heads see their team's work details, not bank details.
+            return [fs for fs in fieldsets if fs[0] != "Bank"]
+        return fieldsets
 
 
 # ---------- Attendance ----------
@@ -251,14 +263,18 @@ class LeaveRequestAdmin(OwnRecordsMixin, admin.ModelAdmin):
 
     def get_actions(self, request):
         actions = super().get_actions(request)
-        if not is_hr_manager(request.user):
+        if not (is_hr_manager(request.user) or is_department_head(request.user)):
             actions.pop("approve_selected", None)
             actions.pop("reject_selected", None)
         return actions
 
     def _review(self, request, queryset, approve):
+        pending = queryset.filter(status=ReviewStatus.PENDING)
+        if not is_hr_manager(request.user):
+            # Department heads review their team's requests, never their own (HR does those).
+            pending = pending.filter(employee__department__head=request.user).exclude(employee__user=request.user)
         done = 0
-        for leave in queryset.filter(status=ReviewStatus.PENDING).select_related("employee__user", "leave_type"):
+        for leave in pending.select_related("employee__user", "leave_type"):
             try:
                 services.review_leave(leave, approve=approve, reviewer=request.user)
             except services.LeaveError as exc:

@@ -113,11 +113,11 @@
       <section class="panel"><p class="empty">Your HR profile isn't set up yet. Ask HR to add you as an employee to use attendance and leave.</p></section>
       {% endif %}
 
-      {% if hr.is_manager %}
+      {% if hr.is_manager or hr.is_head %}
       <section class="panel" aria-labelledby="approvals-title">
         <header class="panel__head panel__head--row">
           <div>
-            <h2 id="approvals-title">Waiting for approval</h2>
+            <h2 id="approvals-title">{% if hr.is_manager %}Waiting for approval{% else %}Your team's leave requests{% endif %}</h2>
             <p>Select requests in the list and use Approve or Reject.</p>
           </div>
         </header>

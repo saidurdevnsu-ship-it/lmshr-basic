@@ -1,9 +1,13 @@
 from datetime import date, datetime
+from io import StringIO
 from unittest import mock
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.test import TestCase
+from django.urls import reverse
 
 from . import services
 from .models import Attendance, Department, Designation, Employee, LeaveRequest, LeaveType, ReviewStatus
@@ -52,6 +56,46 @@ class LeaveBalanceTests(HRTestCase):
         services.cancel_leave(leave, by=self.hr)
         self.assertEqual(Attendance.objects.count(), 0)
         self.assertEqual(services.leave_used(self.employee, self.casual, 2026), 0)
+
+
+class DepartmentHeadTests(HRTestCase):
+    def setUp(self):
+        super().setUp()
+        call_command("setup_hr", stdout=StringIO())
+        User = get_user_model()
+        self.head_user = User.objects.create_user("head", "head@example.com", "Pw-12345!", is_staff=True)
+        self.head_user.groups.add(Group.objects.get(name="Employee"))
+        self.head = Employee.objects.create(user=self.head_user, employee_id="T-000",
+                                            department=self.employee.department,
+                                            designation=self.employee.designation, joining_date=date(2025, 1, 1))
+        self.employee.department.head = self.head_user
+        self.employee.department.save()
+        other_user = User.objects.create_user("karim", password="Pw-12345!", is_staff=True)
+        self.outsider = Employee.objects.create(user=other_user, employee_id="A-001",
+                                                department=Department.objects.create(name="Accounts"),
+                                                designation=self.employee.designation, joining_date=date(2025, 1, 1))
+        self.client.force_login(self.head_user)
+
+    def test_head_sees_own_department_only(self):
+        response = self.client.get(reverse("admin:hr_employee_changelist"))
+        self.assertContains(response, "T-001")
+        self.assertNotContains(response, "A-001")
+
+    def test_head_approves_team_leave_but_not_own(self):
+        team = self.leave(date(2026, 11, 1), date(2026, 11, 1))
+        own = LeaveRequest.objects.create(employee=self.head, leave_type=self.casual, start_date=date(2026, 11, 2),
+                                          end_date=date(2026, 11, 2), reason="Doctor", days=1)
+        self.client.post(reverse("admin:hr_leaverequest_changelist"),
+                         {"action": "approve_selected", "_selected_action": [team.pk, own.pk]})
+        team.refresh_from_db()
+        own.refresh_from_db()
+        self.assertEqual(team.status, ReviewStatus.APPROVED)
+        self.assertEqual(own.status, ReviewStatus.PENDING)
+
+    def test_head_does_not_see_team_bank_details(self):
+        response = self.client.get(reverse("admin:hr_employee_change", args=[self.employee.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "bank_account")
 
 
 class CheckInTests(HRTestCase):

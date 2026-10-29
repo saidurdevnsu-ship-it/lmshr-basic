@@ -141,8 +141,10 @@ def cancel_leave(leave, by):
 
 
 def announce_request(obj, what, summary):
-    """Tell HR managers a leave request is waiting."""
-    notify(users_with_perm("hr.manage_hr"), f"{what} request from {obj.employee.full_name}", body=summary,
+    """Tell HR managers and the employee's department head that a leave request is waiting."""
+    head = obj.employee.department.head
+    notify(users_with_perm("hr.manage_hr") + ([head] if head else []),
+           f"{what} request from {obj.employee.full_name}", body=summary,
            url=reverse(f"admin:hr_{obj._meta.model_name}_change", args=[obj.pk]),
            kind=Notification.Kind.APPROVAL, exclude=obj.employee.user)
 

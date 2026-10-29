@@ -6,6 +6,9 @@ from django.db.models import Q
 
 class Department(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    head = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name="headed_departments",
+                             help_text="Sees this department's records and approves its leave requests.")
 
     class Meta:
         ordering = ["name"]
@@ -31,6 +34,8 @@ class Employee(models.Model):
     employee_id = models.CharField("employee ID", max_length=20, unique=True)
     department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="employees")
     designation = models.ForeignKey(Designation, on_delete=models.PROTECT, related_name="employees")
+    reports_to = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name="direct_reports", help_text="Line manager.")
     joining_date = models.DateField()
     phone = models.CharField(max_length=30, blank=True)
     address = models.TextField(blank=True)

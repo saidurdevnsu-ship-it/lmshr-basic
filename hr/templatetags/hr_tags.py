@@ -4,7 +4,7 @@ from django import template
 from django.conf import settings
 from django.utils import timezone
 
-from hr.admin import is_hr_manager
+from hr.admin import is_department_head, is_hr_manager
 from hr.models import Attendance, Employee, LeaveRequest, ReviewStatus
 from hr.services import leave_balances, working_days
 
@@ -49,6 +49,13 @@ def hr_dashboard(context):
         }
         data["pending_leave"] = list(
             LeaveRequest.objects.filter(status=ReviewStatus.PENDING)
+            .select_related("employee__user", "leave_type").order_by("start_date")[:6]
+        )
+    elif is_department_head(user):
+        data["is_head"] = True
+        data["pending_leave"] = list(
+            LeaveRequest.objects.filter(status=ReviewStatus.PENDING, employee__department__head=user)
+            .exclude(employee__user=user)
             .select_related("employee__user", "leave_type").order_by("start_date")[:6]
         )
     return data
