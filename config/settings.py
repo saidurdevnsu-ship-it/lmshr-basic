@@ -38,12 +38,13 @@ _load_env_file(BASE_DIR / '.env')
 # Local development: DJANGO_DEBUG=true in .env. On the server leave it out (or false) and set the values below.
 DEBUG = os.environ.get('DJANGO_DEBUG', 'false').lower() == 'true'
 
+# No fallback: a key in the code would be public on GitHub. Each computer and server sets its own in .env.
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
 if not SECRET_KEY:
-    if not DEBUG:
-        from django.core.exceptions import ImproperlyConfigured
-        raise ImproperlyConfigured('Set DJANGO_SECRET_KEY in .env (any long random string) when DJANGO_DEBUG is off.')
-    SECRET_KEY = 'django-insecure-+vwx^mm!ouv_m)l2a70n0^ba6%%vjgnrr#xk55#*m3t_b&vq-m'
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        'Set DJANGO_SECRET_KEY in .env. Make one with: python -c "import secrets; print(secrets.token_urlsafe(50))"'
+    )
 
 # Public address of the site, e.g. https://lms.stsgroupbd.com. Links in emails use it.
 SITE_URL = os.environ.get('SITE_URL', '').rstrip('/')
