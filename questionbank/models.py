@@ -6,6 +6,8 @@ from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
+from .documents import ALLOWED_EXTENSIONS as DOCUMENT_EXTENSIONS
+
 
 class Subject(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -51,12 +53,14 @@ class KnowledgeSource(models.Model):
     topic = models.CharField(max_length=200, blank=True, help_text="Optional. The topics this file covers.")
     file = models.FileField(
         upload_to="knowledge/%Y/%m/",
-        validators=[FileExtensionValidator(["pdf", "txt", "md"])],
-        help_text=f"PDF, TXT or Markdown, up to {MAX_UPLOAD_MB} MB. Split very large books into chapters.",
+        validators=[FileExtensionValidator(DOCUMENT_EXTENSIONS)],
+        help_text=f"PDF, Word (.docx), TXT or Markdown, up to {MAX_UPLOAD_MB} MB. Split very large books into chapters.",
     )
     is_active = models.BooleanField(
         default=True, help_text="Only active sources are used when generating questions."
     )
+    content_text = models.TextField("extracted text", blank=True, editable=False,
+                                    help_text="Read from the file on upload. Empty for scanned PDFs.")
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, editable=False
     )
@@ -206,8 +210,8 @@ class QuestionBlueprint(models.Model):
     language = models.CharField(max_length=2, choices=[("en", "English"), ("bn", "Bangla (বাংলা)")], default="en")
     sample_file = models.FileField(
         "sample question paper", upload_to="blueprints/%Y/%m/", blank=True,
-        validators=[FileExtensionValidator(["pdf", "txt", "md"])],
-        help_text="Optional. A past or sample paper (PDF, TXT or Markdown) showing the style you want.",
+        validators=[FileExtensionValidator(DOCUMENT_EXTENSIONS)],
+        help_text="Optional. A past or sample paper (PDF, Word, TXT or Markdown) showing the style you want.",
     )
     instructions = models.TextField("instructions for candidates", blank=True,
                                     default="Answer all questions. Write clearly.")

@@ -39,7 +39,9 @@ class GradeAdmin(admin.ModelAdmin):
 @admin.register(KnowledgeSource)
 class KnowledgeSourceAdmin(admin.ModelAdmin):
     form = KnowledgeSourceForm
-    list_display = ("title", "material_type", "subject", "grade", "chapter", "is_active", "uploaded_by", "created_at")
+    list_display = ("title", "material_type", "subject", "grade", "chapter", "words", "is_active", "uploaded_by",
+                    "created_at")
+    readonly_fields = ("text_preview",)
     list_filter = ("material_type", "subject", "grade", "is_active")
     search_fields = ("title", "chapter", "topic")
     list_select_related = ("subject", "grade", "uploaded_by")
@@ -55,6 +57,18 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj) and self._owns(request, obj)
+
+    @admin.display(description="Words")
+    def words(self, obj):
+        return len(obj.content_text.split()) or "—"
+
+    @admin.display(description="Extracted text")
+    def text_preview(self, obj):
+        if not obj.content_text:
+            return "No text found yet. Scanned PDFs have no text layer; Claude still reads them as images."
+        more = " …" if len(obj.content_text) > 1500 else ""
+        return format_html('<div style="white-space:pre-wrap;max-height:16em;overflow:auto">{}{}</div>',
+                           obj.content_text[:1500], more)
 
     def save_model(self, request, obj, form, change):
         if not change:

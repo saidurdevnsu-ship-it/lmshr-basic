@@ -100,6 +100,36 @@ class FinalPaperTests(BlueprintTestCase):
         self.assertFalse(paper.is_generating)
 
 
+class DocumentUploadTests(BlueprintTestCase):
+    def upload(self, name, content):
+        self.client.force_login(self.controller)
+        return self.client.post(reverse("admin:questionbank_knowledgesource_add"), {
+            "subject": self.bp.subject.pk, "grade": self.bp.grade.pk, "material_type": "lesson_plan",
+            "title": "Lesson 1", "chapter": "Chapter 1", "topic": "", "is_active": "on",
+            "file": SimpleUploadedFile(name, content),
+        })
+
+    def test_word_file_text_is_extracted_and_sent_to_claude(self):
+        doc = Document()
+        doc.add_paragraph("Photosynthesis happens in chloroplasts.")
+        doc.add_table(rows=1, cols=2).rows[0].cells[0].text = "Light"
+        buffer = BytesIO()
+        doc.save(buffer)
+        self.upload("lesson.docx", buffer.getvalue())
+        source = KnowledgeSource.objects.get(title="Lesson 1")
+        self.assertIn("chloroplasts", source.content_text)
+        self.assertIn("Light", source.content_text)
+        block = ai._source_block(source)
+        self.assertEqual(block["source"]["type"], "text")
+        self.assertIn("chloroplasts", block["source"]["data"])
+        self.assertEqual(block["title"], "Lesson plan: Lesson 1 · Chapter 1")
+
+    def test_damaged_word_file_is_refused(self):
+        response = self.upload("broken.docx", b"not really a word file")
+        self.assertContains(response, "couldn")
+        self.assertFalse(KnowledgeSource.objects.filter(title="Lesson 1").exists())
+
+
 class ExportTests(BlueprintTestCase):
     def setUp(self):
         super().setUp()

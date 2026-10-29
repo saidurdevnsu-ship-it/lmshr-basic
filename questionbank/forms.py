@@ -1,6 +1,7 @@
 from django import forms
 
 from .ai import LANGUAGES
+from .documents import UnreadableDocument, extract_text
 from .models import Grade, KnowledgeSource, Question, Subject
 
 
@@ -43,4 +44,9 @@ class KnowledgeSourceForm(forms.ModelForm):
             raise forms.ValidationError(
                 f"This file is larger than {KnowledgeSource.MAX_UPLOAD_MB} MB. Upload it chapter by chapter instead."
             )
+        if f and "file" in self.changed_data:
+            try:
+                self.instance.content_text = extract_text(f)
+            except UnreadableDocument as exc:
+                raise forms.ValidationError(str(exc))
         return f

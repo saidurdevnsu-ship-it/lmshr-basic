@@ -10,6 +10,7 @@ from django.conf import settings
 
 from audit.services import Action, record
 
+from .documents import extract_text
 from .models import KnowledgeSource, Question
 
 logger = logging.getLogger(__name__)
@@ -72,16 +73,17 @@ def claude_status():
 
 
 def _source_block(source):
+    """PDFs go to Claude as PDFs, so it also sees figures and tables; other files as their extracted text."""
     with source.file.open("rb") as fh:
-        data = fh.read()
-    if source.is_pdf:
-        doc_source = {
-            "type": "base64",
-            "media_type": "application/pdf",
-            "data": base64.standard_b64encode(data).decode("ascii"),
-        }
-    else:
-        doc_source = {"type": "text", "media_type": "text/plain", "data": data.decode("utf-8", errors="replace")}
+        if source.is_pdf:
+            doc_source = {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": base64.standard_b64encode(fh.read()).decode("ascii"),
+            }
+        else:
+            text = source.content_text or extract_text(fh, source.file.name)
+            doc_source = {"type": "text", "media_type": "text/plain", "data": text}
     return {"type": "document", "source": doc_source, "title": source.label}
 
 
