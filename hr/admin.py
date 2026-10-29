@@ -1,7 +1,11 @@
+import csv
+from datetime import date
+
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.shortcuts import redirect
+from django.http import HttpResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
@@ -9,7 +13,9 @@ from django.utils.html import format_html
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from . import services
+from audit.services import Action, record
+
+from . import reports, services
 from .forms import LeaveRequestForm, MarkAttendanceDateForm, active_employees
 from .models import Attendance, Department, Designation, Employee, Holiday, LeaveRequest, LeaveType, ReviewStatus
 
@@ -106,7 +112,7 @@ class EmployeeAdmin(OwnRecordsMixin, admin.ModelAdmin):
 @admin.register(Attendance)
 class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
     change_list_template = "admin/hr/attendance/change_list.html"
-    list_display = ("date", "employee", "status_badge", "check_in", "check_out", "note")
+    list_display = ("date", "employee", "status_badge", "check_in", "check_out", "hours", "note")
     list_filter = ("status", "date", "employee__department", "employee")
     date_hierarchy = "date"
     search_fields = ("employee__employee_id", "employee__user__first_name", "employee__user__last_name")
@@ -116,6 +122,11 @@ class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
     @admin.display(description="Status", ordering="status")
     def status_badge(self, obj):
         return format_html('<span class="hr-badge hr-badge--{}">{}</span>', obj.status, obj.get_status_display())
+
+    @admin.display(description="Hours")
+    def hours(self, obj):
+        h = reports.worked_hours(obj)
+        return "—" if h is None else f"{h:g}"
 
     def has_add_permission(self, request):
         return is_hr_manager(request.user) and super().has_add_permission(request)
@@ -132,6 +143,7 @@ class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
             path("check-in/", view(require_POST(self.check_in_view)), name="hr_check_in"),
             path("check-out/", view(require_POST(self.check_out_view)), name="hr_check_out"),
             path("mark/", view(self.mark_view), name="hr_mark_attendance"),
+            path("report/", view(self.report_view), name="hr_attendance_report"),
             *super().get_urls(),
         ]
 
@@ -200,6 +212,44 @@ class AttendanceAdmin(OwnRecordsMixin, admin.ModelAdmin):
             "statuses": Attendance.Status.choices,
         }
         return TemplateResponse(request, "admin/hr/attendance/mark.html", context)
+
+    def changelist_view(self, request, extra_context=None):
+        can_report = is_hr_manager(request.user) or is_department_head(request.user)
+        return super().changelist_view(request, {**(extra_context or {}), "can_report": can_report})
+
+    def report_view(self, request):
+        """Monthly attendance and leave report: HR sees everyone, department heads their departments."""
+        manager = is_hr_manager(request.user)
+        if not (manager or is_department_head(request.user)):
+            raise PermissionDenied
+        today = timezone.localdate()
+        try:
+            year, month = (int(part) for part in request.GET.get("month", "").split("-"))
+            report_date = date(year, month, 1)
+        except ValueError:
+            report_date = today.replace(day=1)
+        employees = active_employees().order_by("department__name", "employee_id")
+        if not manager:
+            employees = employees.filter(department__head=request.user)
+        report = reports.monthly_report(list(employees), report_date.year, report_date.month)
+
+        if request.GET.get("format") == "csv":
+            record(request.user, Action.REPORT_EXPORTED, request=request,
+                   details=f"Attendance report {report_date:%B %Y}, {len(report['rows'])} employee(s)")
+            response = HttpResponse(content_type="text/csv; charset=utf-8")
+            response["Content-Disposition"] = f'attachment; filename="attendance-{report_date:%Y-%m}.csv"'
+            response.write("\ufeff")  # lets Excel read Bangla names correctly
+            csv.writer(response).writerows(reports.report_csv_rows(report))
+            return response
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "title": f"Attendance report · {report_date:%B %Y}",
+            "report": report,
+            "is_manager": manager,
+        }
+        return TemplateResponse(request, "admin/hr/attendance/report.html", context)
 
 
 # ---------- Leave ----------

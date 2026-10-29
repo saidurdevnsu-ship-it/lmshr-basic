@@ -26,6 +26,7 @@ class AuditEvent(models.Model):
         LEAVE_APPROVED = "leave_approved", "Approved leave"
         LEAVE_REJECTED = "leave_rejected", "Rejected leave"
         LEAVE_CANCELLED = "leave_cancelled", "Cancelled leave"
+        REPORT_EXPORTED = "report_exported", "Downloaded HR report"
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,

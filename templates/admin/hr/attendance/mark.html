@@ -30,7 +30,7 @@
 </div>
 
 {% if not is_workday %}
-<p class="hr-notice">{{ day|date:"l, j F Y" }} is a weekend or holiday. You can still record attendance, but it won't count toward pay deductions.</p>
+<p class="hr-notice">{{ day|date:"l, j F Y" }} is a weekend or holiday. You can still record attendance, but it won't count as a working day in reports.</p>
 {% endif %}
 
 {% if rows %}

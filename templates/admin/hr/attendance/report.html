@@ -1,0 +1,59 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-hr.css' %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-hr model-attendance{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">Home</a></li>
+  <li><a href="{% url 'admin:app_list' app_label='hr' %}">HR</a></li>
+  <li><a href="{% url 'admin:hr_attendance_changelist' %}">Attendance</a></li>
+  <li aria-current="page">Monthly report</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="hr-mark-head">
+  <form method="get">
+    <div>
+      <label for="report-month">Month</label>
+      <input type="month" id="report-month" name="month" value="{{ report.first|date:'Y-m' }}">
+    </div>
+    <button type="submit" class="button">Show</button>
+  </form>
+  <a class="button" href="?month={{ report.first|date:'Y-m' }}&amp;format=csv">Download CSV (Excel)</a>
+</div>
+
+<p class="hr-notice">{{ report.first|date:"F Y" }} · {{ report.working_days }} working day{{ report.working_days|pluralize }} so far{% if not is_manager %} · your department{% endif %}. Hours are counted from check-in to check-out. Leave taken is for the whole of {{ report.first.year }}.</p>
+
+{% if report.rows %}
+<div class="module" style="overflow-x:auto">
+  <table style="width:100%">
+    <thead>
+      <tr>
+        <th scope="col">Employee</th><th scope="col">Department</th>
+        <th scope="col">Present</th><th scope="col">Late</th><th scope="col">Half day</th><th scope="col">Absent</th>
+        <th scope="col">On leave</th><th scope="col">Not marked</th><th scope="col">Hours</th><th scope="col">Avg / day</th>
+        {% for lt in report.leave_types %}<th scope="col">{{ lt.name }} leave</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in report.rows %}
+      <tr>
+        <td>{{ row.employee.full_name }} <small>({{ row.employee.employee_id }})</small></td>
+        <td>{{ row.employee.department }}</td>
+        <td>{{ row.present }}</td><td>{{ row.late }}</td><td>{{ row.half_day }}</td><td>{{ row.absent }}</td>
+        <td>{{ row.on_leave }}</td><td>{{ row.unmarked }}</td>
+        <td>{{ row.hours|floatformat:"-1" }}</td><td>{{ row.avg_hours|floatformat:"-1"|default:"—" }}</td>
+        {% for days in row.leave_taken %}<td>{{ days|floatformat:"-1" }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">No active employees to report on.</p>
+{% endif %}
+{% endblock %}

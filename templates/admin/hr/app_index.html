@@ -118,6 +118,7 @@
         <header class="panel__head panel__head--row">
           <div>
             <h2 id="approvals-title">{% if hr.is_manager %}Waiting for approval{% else %}Your team's leave requests{% endif %}</h2>
+            {% if hr.is_head %}<p><a class="dash-link" href="{% url 'admin:hr_attendance_report' %}">Team attendance report</a></p>{% endif %}
             <p>Select requests in the list and use Approve or Reject.</p>
           </div>
         </header>
@@ -212,6 +213,7 @@
         <ul class="quick">
           <li><a href="{% url 'admin:hr_mark_attendance' %}"><span>Mark today's attendance</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
           <li><a href="{% url 'admin:hr_employee_add' %}"><span>Add an employee</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
+          <li><a href="{% url 'admin:hr_attendance_report' %}"><span>Monthly attendance &amp; leave report</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
           <li><a href="{% url 'admin:hr_holiday_changelist' %}"><span>Holidays calendar</span><svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z" clip-rule="evenodd"/></svg></a></li>
         </ul>
       </section>

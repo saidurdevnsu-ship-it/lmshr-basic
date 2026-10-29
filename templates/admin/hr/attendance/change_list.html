@@ -5,5 +5,8 @@
   {% if has_add_permission %}
   <li><a href="{% url 'admin:hr_mark_attendance' %}">Mark attendance for a day</a></li>
   {% endif %}
+  {% if can_report %}
+  <li><a href="{% url 'admin:hr_attendance_report' %}">Monthly report</a></li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}

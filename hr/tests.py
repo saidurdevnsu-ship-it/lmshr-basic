@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from io import StringIO
 from unittest import mock
 from zoneinfo import ZoneInfo
@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from audit.models import AuditEvent
 
-from . import services
+from . import reports, services
 from .models import Attendance, Department, Designation, Employee, LeaveRequest, LeaveType, ReviewStatus
 
 DHAKA = ZoneInfo("Asia/Dhaka")
@@ -96,10 +96,46 @@ class DepartmentHeadTests(HRTestCase):
         entry = AuditEvent.objects.get(action=AuditEvent.Action.LEAVE_APPROVED)
         self.assertEqual((entry.actor, entry.target_id), (self.head_user, str(team.pk)))
 
+    def test_head_report_covers_own_department_only(self):
+        response = self.client.get(reverse("admin:hr_attendance_report") + "?month=2026-10")
+        self.assertContains(response, "T-001")
+        self.assertNotContains(response, "A-001")
+
     def test_head_does_not_see_team_bank_details(self):
         response = self.client.get(reverse("admin:hr_employee_change", args=[self.employee.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "bank_account")
+
+
+class ReportTests(HRTestCase):
+    def setUp(self):
+        super().setUp()
+        day = date(2026, 10, 4)  # a Sunday, a working day
+        Attendance.objects.create(employee=self.employee, date=day, status=Attendance.Status.LATE,
+                                  check_in=time(9, 30), check_out=time(17, 15))
+        Attendance.objects.create(employee=self.employee, date=date(2026, 10, 5), status=Attendance.Status.ABSENT)
+        self.leave(date(2026, 3, 1), date(2026, 3, 2), ReviewStatus.APPROVED)  # 2 casual days this year
+
+    def test_monthly_report_counts_days_hours_and_leave(self):
+        with mock.patch("hr.reports.timezone.localdate", return_value=date(2026, 10, 31)):
+            report = reports.monthly_report([self.employee], 2026, 10)
+        row = report["rows"][0]
+        self.assertEqual((row["late"], row["absent"], row["hours"]), (1, 1, 7.75))
+        self.assertEqual(row["unmarked"], report["working_days"] - 2)
+        self.assertEqual(row["leave_taken"], [2])
+
+    def test_hr_downloads_csv_and_it_is_logged(self):
+        self.client.force_login(self.hr)
+        response = self.client.get(reverse("admin:hr_attendance_report") + "?month=2026-10&format=csv")
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        lines = response.content.decode("utf-8-sig").splitlines()
+        self.assertTrue(lines[0].startswith("Employee ID,Name,Department"))
+        self.assertIn("T-001,rahim,Academics,0,1,0,1,0", lines[1])
+        self.assertTrue(AuditEvent.objects.filter(action=AuditEvent.Action.REPORT_EXPORTED).exists())
+
+    def test_employees_cannot_open_the_report(self):
+        self.client.force_login(self.employee.user)
+        self.assertEqual(self.client.get(reverse("admin:hr_attendance_report")).status_code, 403)
 
 
 class CheckInTests(HRTestCase):
