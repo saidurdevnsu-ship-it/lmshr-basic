@@ -35,7 +35,7 @@ class GenerateQuestionsForm(forms.Form):
 class KnowledgeSourceForm(forms.ModelForm):
     class Meta:
         model = KnowledgeSource
-        fields = ["subject", "grade", "title", "file", "is_active"]
+        fields = ["subject", "grade", "material_type", "title", "chapter", "topic", "file", "is_active"]
 
     def clean_file(self):
         f = self.cleaned_data["file"]

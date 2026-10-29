@@ -15,12 +15,20 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         teacher, _ = Group.objects.get_or_create(name="Teacher / Subject Expert")
         teacher.permissions.add(*perms(
-            "view_subject", "view_grade", "view_knowledgesource", "view_academicevent",
+            "view_subject", "view_grade", "view_academicevent",
+            # Upload books, syllabi and lesson plans; teachers can change or remove only their own uploads.
+            "add_knowledgesource", "change_knowledgesource", "delete_knowledgesource", "view_knowledgesource",
             "add_question", "change_question", "view_question",
             "add_questionblueprint", "change_questionblueprint", "view_questionblueprint",
             "add_blueprintitem", "change_blueprintitem", "delete_blueprintitem", "view_blueprintitem",
         ))
-        self.stdout.write("Role: Teacher / Subject Expert (writes blueprints and sample questions)")
+        self.stdout.write("Role: Teacher / Subject Expert (uploads materials, writes blueprints and sample questions)")
+
+        read_only, _ = Group.objects.get_or_create(name="Read-Only")
+        read_only.permissions.add(*perms(
+            "view_subject", "view_grade", "view_knowledgesource", "view_academicevent", "view_question",
+        ))
+        self.stdout.write("Role: Read-Only (views materials, the question bank and the calendar; can't change anything)")
 
         hod, _ = Group.objects.get_or_create(name="Head of Department")
         hod.permissions.add(*Permission.objects.filter(content_type__app_label="questionbank").exclude(codename=FINAL))

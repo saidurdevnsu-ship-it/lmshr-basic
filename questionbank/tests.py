@@ -5,11 +5,12 @@ from io import StringIO
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 from notifications.models import Notification
 
@@ -122,6 +123,42 @@ class ReminderTests(BlueprintTestCase):
         self.assertIn("Science mid-term", mail.outbox[0].body)
         call_command("send_reminders", stdout=StringIO())
         self.assertEqual(len(mail.outbox), 1)
+
+
+class RoleTests(BlueprintTestCase):
+    def setUp(self):
+        super().setUp()
+        call_command("setup_academics", stdout=StringIO())
+        User = get_user_model()
+        self.teacher = User.objects.create_user("teacher", password="Pw-12345!", is_staff=True)
+        self.teacher.groups.add(Group.objects.get(name="Teacher / Subject Expert"))
+        self.viewer = User.objects.create_user("viewer", password="Pw-12345!", is_staff=True)
+        self.viewer.groups.add(Group.objects.get(name="Read-Only"))
+        self.book = KnowledgeSource.objects.get()  # uploaded by nobody in particular
+
+    def upload(self):
+        return self.client.post(reverse("admin:questionbank_knowledgesource_add"), {
+            "subject": self.bp.subject.pk, "grade": self.bp.grade.pk, "material_type": "syllabus",
+            "title": "Science syllabus", "chapter": "", "topic": "", "is_active": "on",
+            "file": SimpleUploadedFile("syllabus.txt", b"Unit 1: Cells"),
+        })
+
+    def test_teacher_uploads_and_edits_only_own_materials(self):
+        self.client.force_login(self.teacher)
+        self.upload()
+        mine = KnowledgeSource.objects.get(title="Science syllabus")
+        self.assertEqual(mine.uploaded_by, self.teacher)
+        self.assertEqual(mine.label, "Syllabus: Science syllabus")
+        change = "admin:questionbank_knowledgesource_change"
+        self.assertContains(self.client.get(reverse(change, args=[mine.pk])), 'name="_save"')
+        self.assertNotContains(self.client.get(reverse(change, args=[self.book.pk])), 'name="_save"')
+
+    def test_read_only_user_can_view_but_not_add(self):
+        self.client.force_login(self.viewer)
+        self.assertEqual(self.client.get(reverse("admin:questionbank_knowledgesource_changelist")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("admin:questionbank_question_changelist")).status_code, 200)
+        self.assertEqual(self.upload().status_code, 403)
+        self.assertEqual(self.client.get(reverse("admin:questionbank_questionblueprint_changelist")).status_code, 403)
 
 
 class ReviewTests(BlueprintTestCase):

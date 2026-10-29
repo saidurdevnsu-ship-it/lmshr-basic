@@ -38,9 +38,22 @@ class GradeAdmin(admin.ModelAdmin):
 @admin.register(KnowledgeSource)
 class KnowledgeSourceAdmin(admin.ModelAdmin):
     form = KnowledgeSourceForm
-    list_display = ("title", "subject", "grade", "is_active", "uploaded_by", "created_at")
-    list_filter = ("subject", "grade", "is_active")
-    search_fields = ("title",)
+    list_display = ("title", "material_type", "subject", "grade", "chapter", "is_active", "uploaded_by", "created_at")
+    list_filter = ("material_type", "subject", "grade", "is_active")
+    search_fields = ("title", "chapter", "topic")
+    list_select_related = ("subject", "grade", "uploaded_by")
+
+    @staticmethod
+    def _owns(request, obj):
+        # Teachers edit and remove the files they uploaded; HODs and the super admin manage all of them.
+        user = request.user
+        return obj is None or obj.uploaded_by_id == user.pk or user.is_superuser or can_review(user)
+
+    def has_change_permission(self, request, obj=None):
+        return super().has_change_permission(request, obj) and self._owns(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj) and self._owns(request, obj)
 
     def save_model(self, request, obj, form, change):
         if not change:

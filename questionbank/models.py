@@ -30,13 +30,25 @@ class Grade(models.Model):
 
 
 class KnowledgeSource(models.Model):
-    """A textbook or notes file that Claude reads when generating questions for a subject and grade."""
+    """A textbook, syllabus, lesson plan or other file that Claude reads when generating questions for a subject and
+    grade."""
 
     MAX_UPLOAD_MB = 20
+
+    class MaterialType(models.TextChoices):
+        TEXTBOOK = "textbook", "Textbook"
+        SYLLABUS = "syllabus", "Syllabus"
+        LESSON_PLAN = "lesson_plan", "Lesson plan"
+        SAMPLE_QUESTIONS = "sample_questions", "Sample questions / past paper"
+        NOTES = "notes", "Teaching notes"
 
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="sources")
     grade = models.ForeignKey(Grade, on_delete=models.CASCADE, related_name="sources")
     title = models.CharField(max_length=200)
+    material_type = models.CharField("type", max_length=20, choices=MaterialType.choices, default=MaterialType.TEXTBOOK)
+    chapter = models.CharField(max_length=200, blank=True,
+                               help_text='e.g. "Chapter 3: Photosynthesis". Leave blank if the file covers the whole book.')
+    topic = models.CharField(max_length=200, blank=True, help_text="Optional. The topics this file covers.")
     file = models.FileField(
         upload_to="knowledge/%Y/%m/",
         validators=[FileExtensionValidator(["pdf", "txt", "md"])],
@@ -51,12 +63,18 @@ class KnowledgeSource(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["subject", "grade", "title"]
+        ordering = ["subject", "grade", "chapter", "title"]
         verbose_name = "book / knowledge source"
         verbose_name_plural = "books & knowledge sources"
 
     def __str__(self):
         return f"{self.title} ({self.subject}, {self.grade})"
+
+    @property
+    def label(self):
+        """How the file is named to Claude, so it can tell a syllabus from a textbook chapter."""
+        parts = [f"{self.get_material_type_display()}: {self.title}", self.chapter, self.topic and f"topics: {self.topic}"]
+        return " · ".join(p for p in parts if p)
 
     @property
     def is_pdf(self):

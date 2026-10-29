@@ -80,7 +80,7 @@ def _source_block(source):
         }
     else:
         doc_source = {"type": "text", "media_type": "text/plain", "data": data.decode("utf-8", errors="replace")}
-    return {"type": "document", "source": doc_source, "title": source.title}
+    return {"type": "document", "source": doc_source, "title": source.label}
 
 
 def _build_request(sources, *, subject, grade, topic, question_type, difficulty, count, language):
@@ -296,7 +296,8 @@ def generate_final_paper(blueprint, user):
     documents = [_source_block(s) for s in sources]
     documents[-1]["cache_control"] = {"type": "ephemeral"}
     if blueprint.sample_file:
-        sample = KnowledgeSource(title="Sample paper (style reference only)", file=blueprint.sample_file)
+        sample = KnowledgeSource(title="Sample paper (style reference only)", file=blueprint.sample_file,
+                                 material_type=KnowledgeSource.MaterialType.SAMPLE_QUESTIONS)
         documents.append(_source_block(sample))
     messages = [{"role": "user", "content": [*documents, {"type": "text", "text": _blueprint_text(blueprint, items)}]}]
 
