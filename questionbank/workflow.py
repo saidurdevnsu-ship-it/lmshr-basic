@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import Action, record
+from learning.approvals import SELF_APPROVAL_MESSAGE, is_own
 from notifications.models import Notification
 from notifications.services import notify, users_with_perm
 
@@ -69,8 +70,8 @@ def submit(bp, user):
 
 
 def reviews_own(bp, user):
-    """A HOD can't review a blueprint they wrote themselves; another HOD (or the super admin) must."""
-    return bp.assigned_to_id == user.pk and not user.is_superuser
+    """A HOD can't review a blueprint they wrote themselves; another HOD must."""
+    return is_own(user, bp.assigned_to_id)
 
 
 @transaction.atomic
@@ -78,7 +79,7 @@ def approve(bp, user, note=""):
     if bp.status != Status.IN_REVIEW:
         raise WorkflowError("Only blueprints waiting for review can be approved.")
     if reviews_own(bp, user):
-        raise WorkflowError("You wrote this blueprint, so another HOD has to review it.")
+        raise WorkflowError(SELF_APPROVAL_MESSAGE)
     bp.status = Status.APPROVED
     bp.reviewed_by, bp.reviewed_at = user, timezone.now()
     if note:
@@ -98,7 +99,7 @@ def return_to_author(bp, user, note):
     if bp.status != Status.IN_REVIEW:
         raise WorkflowError("Only blueprints waiting for review can be returned.")
     if reviews_own(bp, user):
-        raise WorkflowError("You wrote this blueprint, so another HOD has to review it.")
+        raise WorkflowError(SELF_APPROVAL_MESSAGE)
     if not note.strip():
         raise WorkflowError("Add a comment so the teacher knows what to change.")
     bp.status = Status.RETURNED

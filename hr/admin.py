@@ -328,7 +328,8 @@ class LeaveRequestAdmin(OwnRecordsMixin, admin.ModelAdmin):
             try:
                 services.review_leave(leave, approve=approve, reviewer=request.user)
             except services.LeaveError as exc:
-                self.message_user(request, f"Not approved: {leave}. {exc}", messages.ERROR)
+                self.message_user(request, f"Not {'approved' if approve else 'rejected'}: {leave}. {exc}",
+                                  messages.ERROR)
             else:
                 done += 1
         verb = "Approved" if approve else "Rejected"

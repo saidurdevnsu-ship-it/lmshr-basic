@@ -20,7 +20,7 @@ from notifications.models import Notification
 from . import ai, workflow
 from .forms import GenerateQuestionsForm
 from .models import (
-    AcademicEvent, BlueprintItem, FinalPaper, Grade, KnowledgeSource, QuestionBlueprint, Subject,
+    AcademicEvent, BlueprintItem, FinalPaper, Grade, KnowledgeSource, Question, QuestionBlueprint, Subject,
 )
 from .reminders import ensure_reminders
 
@@ -328,7 +328,59 @@ class ReviewTests(BlueprintTestCase):
     def test_hod_cannot_approve_own_blueprint(self):
         self.bp.status = QuestionBlueprint.Status.IN_REVIEW
         self.bp.save()
-        with self.assertRaisesMessage(workflow.WorkflowError, "another HOD"):
+        with self.assertRaisesMessage(workflow.WorkflowError, "your own work"):
             workflow.approve(self.bp, self.hod)
-        workflow.approve(self.bp, self.controller)  # the super admin can
+        workflow.approve(self.bp, self.controller)  # someone else can
         self.assertEqual(self.bp.status, QuestionBlueprint.Status.APPROVED)
+
+    def test_super_admin_cannot_approve_own_blueprint_either(self):
+        self.bp.status, self.bp.assigned_to = QuestionBlueprint.Status.IN_REVIEW, self.controller
+        self.bp.save()
+        with self.assertRaisesMessage(workflow.WorkflowError, "your own work"):
+            workflow.approve(self.bp, self.controller)
+
+
+class QuestionApprovalTests(BlueprintTestCase):
+    def setUp(self):
+        super().setUp()
+        call_command("setup_academics", stdout=StringIO())
+        User = get_user_model()
+        self.teacher = User.objects.create_user("teacher", password="Pw-12345!", is_staff=True)
+        self.teacher.groups.add(Group.objects.get(name="Teacher / Subject Expert"))
+        self.head = User.objects.create_user("head", password="Pw-12345!", is_staff=True)
+        self.head.groups.add(Group.objects.get(name="Head of Department"))
+        make = lambda by, text: Question.objects.create(subject=self.bp.subject, grade=self.bp.grade,
+                                                        question_type="short", text=text, answer="A", created_by=by)
+        self.teachers_q, self.heads_q = make(self.teacher, "Teacher's question"), make(self.head, "HOD's question")
+
+    def act(self, user, action, *questions):
+        self.client.force_login(user)
+        return self.client.post(reverse("admin:questionbank_question_changelist"),
+                                {"action": action, "_selected_action": [q.pk for q in questions]})
+
+    def status(self, q):
+        q.refresh_from_db()
+        return q.status
+
+    def test_teacher_cannot_approve_questions(self):
+        self.act(self.teacher, "approve", self.teachers_q)
+        self.assertEqual(self.status(self.teachers_q), Question.Status.DRAFT)
+
+    def test_teacher_cannot_approve_by_editing_status(self):
+        self.client.force_login(self.teacher)
+        url = reverse("admin:questionbank_question_change", args=[self.teachers_q.pk])
+        self.assertNotContains(self.client.get(url), 'name="status"')
+
+    def test_hod_approves_others_but_not_own(self):
+        self.act(self.head, "approve", self.teachers_q, self.heads_q)
+        self.assertEqual(self.status(self.teachers_q), Question.Status.APPROVED)
+        self.assertEqual(self.status(self.heads_q), Question.Status.DRAFT)
+
+    def test_editing_an_approved_question_sends_it_back_to_draft(self):
+        self.act(self.head, "approve", self.teachers_q)
+        self.client.force_login(self.teacher)
+        self.client.post(reverse("admin:questionbank_question_change", args=[self.teachers_q.pk]), {
+            "subject": self.bp.subject.pk, "grade": self.bp.grade.pk, "topic": "", "question_type": "short",
+            "difficulty": "medium", "text": "Teacher's question, reworded", "options": "[]", "answer": "A",
+            "explanation": "", "source_reference": ""})
+        self.assertEqual(self.status(self.teachers_q), Question.Status.DRAFT)

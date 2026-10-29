@@ -51,6 +51,16 @@ class LeaveBalanceTests(HRTestCase):
         self.assertEqual(services.leave_used(self.employee, self.casual, 2026), 3)
         self.assertEqual(services.leave_used(self.employee, self.casual, 2027), 1)
 
+    def test_hr_manager_cannot_review_own_leave(self):
+        self.employee.user = self.hr
+        self.employee.save()
+        leave = self.leave(date(2026, 11, 1), date(2026, 11, 1))
+        for approve in (True, False):
+            with self.assertRaisesMessage(services.LeaveError, "your own work"):
+                services.review_leave(leave, approve=approve, reviewer=self.hr)
+        leave.refresh_from_db()
+        self.assertEqual(leave.status, ReviewStatus.PENDING)
+
     def test_cancelling_approved_leave_clears_attendance_and_restores_balance(self):
         leave = self.leave(date(2026, 11, 1), date(2026, 11, 2))
         services.review_leave(leave, approve=True, reviewer=self.hr)

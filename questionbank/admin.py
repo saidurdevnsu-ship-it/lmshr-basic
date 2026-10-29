@@ -13,6 +13,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 
 from audit.services import Action, record
+from learning.approvals import SELF_APPROVAL_MESSAGE, is_own, others_only
 
 from . import export, workflow
 from .ai import GenerationError, claude_status, generate_questions, start_final_paper
@@ -106,22 +107,45 @@ class QuestionAdmin(admin.ModelAdmin):
             return "—"
         return format_html_join("", "<div>{}. {}</div>", ((chr(65 + i), o) for i, o in enumerate(obj.options)))
 
+    def has_approve_permission(self, request):
+        return request.user.has_perm("questionbank.approve_question")
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        # Only approvers set the status, and never on a question they created (new questions start as drafts).
+        if obj is None or not self.has_approve_permission(request) or is_own(request.user, obj.created_by_id):
+            readonly.append("status")
+        return readonly
+
     def save_model(self, request, obj, form, change):
         if not change:
             obj.created_by = request.user
+        elif (obj.status == Question.Status.APPROVED and form.changed_data
+              and not (self.has_approve_permission(request) and not is_own(request.user, obj.created_by_id))):
+            # An approved question edited by someone who can't approve it goes back for review.
+            obj.status = Question.Status.DRAFT
+            self.message_user(request, "The question was approved before; your changes send it back to draft for "
+                                       "an HOD to approve again.", messages.WARNING)
         super().save_model(request, obj, form, change)
 
-    @admin.action(description="Approve selected questions", permissions=["change"])
-    def approve(self, request, queryset):
-        updated = queryset.update(status=Question.Status.APPROVED)
-        record(request.user, Action.QUESTIONS_APPROVED, details=f"{updated} question(s)", request=request)
-        self.message_user(request, f"Approved {updated} question(s).", messages.SUCCESS)
+    def _set_status(self, request, queryset, status, action):
+        own = queryset.filter(created_by=request.user).count()
+        updated = others_only(queryset, request.user, "created_by").update(status=status)
+        if updated:
+            record(request.user, action, details=f"{updated} question(s)", request=request)
+        verb = "Approved" if status == Question.Status.APPROVED else "Rejected"
+        self.message_user(request, f"{verb} {updated} question(s).", messages.SUCCESS if updated else messages.WARNING)
+        if own:
+            self.message_user(request, f"Skipped {own} question(s) you created. {SELF_APPROVAL_MESSAGE}",
+                              messages.WARNING)
 
-    @admin.action(description="Reject selected questions", permissions=["change"])
+    @admin.action(description="Approve selected questions", permissions=["approve"])
+    def approve(self, request, queryset):
+        self._set_status(request, queryset, Question.Status.APPROVED, Action.QUESTIONS_APPROVED)
+
+    @admin.action(description="Reject selected questions", permissions=["approve"])
     def reject(self, request, queryset):
-        updated = queryset.update(status=Question.Status.REJECTED)
-        record(request.user, Action.QUESTIONS_REJECTED, details=f"{updated} question(s)", request=request)
-        self.message_user(request, f"Rejected {updated} question(s).", messages.WARNING)
+        self._set_status(request, queryset, Question.Status.REJECTED, Action.QUESTIONS_REJECTED)
 
     def get_urls(self):
         return [

@@ -35,7 +35,7 @@
   {% endif %}
 
   {% if bp.status == "in_review" and not can_review_now and bp.assigned_to_id == request.user.pk and perms.questionbank.review_blueprint %}
-  <div class="wf-note">You wrote this blueprint, so another HOD has to review it.</div>
+  <div class="wf-note">You can't approve or reject your own work, so another HOD has to review this blueprint.</div>
   {% endif %}
 
   {% if can_review_now %}

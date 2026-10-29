@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import Action, record
+from learning.approvals import SELF_APPROVAL_MESSAGE, is_own
 from notifications.make import leave_approved_data, send_event
 from notifications.models import Notification
 from notifications.services import notify, users_with_perm
@@ -97,7 +98,10 @@ def validate_leave(leave):
 @transaction.atomic
 def review_leave(leave, *, approve, reviewer, note=""):
     """Approve or reject a pending request. Approval checks the balance again, since other leave may have been
-    approved since this request was made, and raises LeaveError if it no longer fits."""
+    approved since this request was made, and raises LeaveError if it no longer fits. Nobody reviews their own
+    request."""
+    if is_own(reviewer, leave.employee.user_id):
+        raise LeaveError(SELF_APPROVAL_MESSAGE)
     if approve:
         problems = balance_problems(leave)
         if problems:

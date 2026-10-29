@@ -130,6 +130,7 @@ class Question(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["subject", "grade", "status"])]
+        permissions = [("approve_question", "Can approve or reject questions in the bank (HOD)")]
 
     def __str__(self):
         return self.text if len(self.text) <= 80 else f"{self.text[:77]}..."
