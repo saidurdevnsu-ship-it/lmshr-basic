@@ -7,6 +7,7 @@ from django.contrib.auth.models import Group, User
 from notifications.make import send_event, user_created_data
 from questionbank.models import SubjectAssignment
 
+from .roles import DEFAULT_ROLES, ensure_roles, keep_final_papers_confidential
 from .welcome import send_welcome_email
 
 
@@ -60,7 +61,43 @@ admin.site.unregister(Group)
 
 @admin.register(Group)
 class RoleAdmin(BaseGroupAdmin):
-    """Only super admins create roles or change what they allow; others can look."""
+    """Only super admins create roles or change what they allow; others can look. Predefined roles start with
+    default permissions (learning/roles.py) and can be edited or reset to those defaults."""
+
+    list_display = ("name", "predefined", "permission_count")
+    actions = ("reset_to_defaults",)
+
+    @admin.display(description="Predefined", boolean=True)
+    def predefined(self, obj):
+        return obj.name in DEFAULT_ROLES
+
+    @admin.display(description="Permissions")
+    def permission_count(self, obj):
+        return obj.permissions.count()
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if obj is not None and obj.name in DEFAULT_ROLES:
+            form.base_fields["permissions"].help_text = (
+                f"Default role: {DEFAULT_ROLES[obj.name]['description']} You can change its permissions; "
+                "“Reset to default permissions” in the role list restores them.")
+        return form
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if keep_final_papers_confidential():
+            self.message_user(request, "Final papers stay with the Exam Controller role only, so that permission "
+                                       "was taken off this role.", messages.WARNING)
+
+    @admin.action(description="Reset to default permissions", permissions=["change"])
+    def reset_to_defaults(self, request, queryset):
+        names = [g.name for g in queryset if g.name in DEFAULT_ROLES]
+        if names:
+            ensure_roles(names, reset=True)
+            self.message_user(request, f"Restored default permissions for: {', '.join(names)}.", messages.SUCCESS)
+        if len(names) < queryset.count():
+            self.message_user(request, "Roles you created yourself have no defaults, so they were left as they are.",
+                              messages.WARNING)
 
     def has_add_permission(self, request):
         return request.user.is_superuser

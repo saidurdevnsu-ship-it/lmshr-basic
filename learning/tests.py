@@ -1,11 +1,15 @@
+from io import StringIO
 from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core import mail
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
+
+from .roles import DEFAULT_ROLES
 
 
 class HomeTests(TestCase):
@@ -146,6 +150,40 @@ class EscalationTests(TestCase):
         self.client.post(reverse("admin:auth_group_change", args=[self.user_admin_role.pk]),
                          {"name": "User admin", "permissions": [extra.pk]})
         self.assertFalse(self.user_admin_role.permissions.filter(pk=extra.pk).exists())
+
+
+class PredefinedRoleTests(TestCase):
+    def setUp(self):
+        self.boss = get_user_model().objects.create_superuser("boss", "boss@example.com", "Pw-12345!")
+        self.hod = Group.objects.get(name="Head of Department")  # created by migrate, no setup command needed
+        self.delete_q = Permission.objects.get(codename="delete_question")
+
+    def test_all_predefined_roles_exist_after_migrate(self):
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)) & set(DEFAULT_ROLES), set(DEFAULT_ROLES))
+        self.assertTrue(self.hod.permissions.filter(codename="approve_question").exists())
+
+    def test_edits_survive_setup_commands_until_reset(self):
+        self.hod.permissions.remove(self.delete_q)
+        call_command("setup_academics", stdout=StringIO())
+        self.assertFalse(self.hod.permissions.filter(pk=self.delete_q.pk).exists())
+        call_command("setup_academics", "--reset", stdout=StringIO())
+        self.assertTrue(self.hod.permissions.filter(pk=self.delete_q.pk).exists())
+
+    def test_reset_action_in_admin(self):
+        self.hod.permissions.clear()
+        self.client.force_login(self.boss)
+        self.client.post(reverse("admin:auth_group_changelist"),
+                         {"action": "reset_to_defaults", "_selected_action": [self.hod.pk]})
+        self.assertTrue(self.hod.permissions.filter(codename="approve_question").exists())
+
+    def test_final_paper_permission_stays_with_exam_controller(self):
+        final = Permission.objects.get(codename="manage_final_papers")
+        self.client.force_login(self.boss)
+        perms = list(self.hod.permissions.values_list("pk", flat=True)) + [final.pk]
+        self.client.post(reverse("admin:auth_group_change", args=[self.hod.pk]),
+                         {"name": self.hod.name, "permissions": perms})
+        self.assertFalse(self.hod.permissions.filter(pk=final.pk).exists())
+        self.assertTrue(self.hod.permissions.filter(codename="approve_question").exists())  # rest was saved
 
 
 @override_settings(MAKE_WEBHOOK_URL="https://hook.example.com/abc")
