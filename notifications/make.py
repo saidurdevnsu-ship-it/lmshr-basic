@@ -1,12 +1,14 @@
 """Send app events to a Make.com scenario, by webhook (preferred) or mailhook.
 
 Each event is JSON: {"event": "...", "app": "STS Pulse", "sent_at": "...", "data": {...}}, so one scenario can route
-on "event". Never send passwords, leave reasons or exam content here: the data leaves this system. The one exception
-is "user.welcome" (learning/welcome.py), which carries the one-time set-password link so Make can email it.
+on "event". Send only what the scenario needs: the data leaves this system. Never send passwords, phone numbers,
+leave reasons or exam content. The one exception is "user.welcome" (learning/welcome.py), which carries the
+one-time set-password link so Make can email it.
 """
 
 import json
 import logging
+import threading
 import urllib.error
 import urllib.request
 
@@ -45,7 +47,8 @@ def deliver(payload):
 
 
 def send_event(event, data):
-    """Queue an event for Make once the current database transaction commits. Failures are logged, never raised."""
+    """Send an event to Make once the current database transaction commits, in a background thread so a slow
+    Make response never holds up the person's click. Failures are logged, never raised."""
     if not make_configured():
         return
     payload = build_payload(event, data)
@@ -58,7 +61,7 @@ def send_event(event, data):
         except Exception:
             logger.exception("Couldn't send %s to Make", event)
 
-    transaction.on_commit(_send)
+    transaction.on_commit(lambda: threading.Thread(target=_send, daemon=True).start())
 
 
 # ---------- Event shapes ----------
@@ -82,7 +85,6 @@ def leave_approved_data(leave):
         "employee_id": employee.employee_id,
         "name": employee.full_name,
         "email": employee.user.email,
-        "phone": employee.phone,
         "department": str(employee.department),
         "designation": str(employee.designation),
         "leave_type": str(leave.leave_type),

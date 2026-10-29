@@ -1,6 +1,8 @@
+from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -83,6 +85,81 @@ class PasswordResetTests(TestCase):
         self.assertEqual(payload["data"]["to"], "nadia@example.com")
         self.assertIn("https://lms.example.com/accounts/reset/", payload["data"]["text"])
         self.assertEqual(mail.outbox, [])
+
+
+class SignInTests(TestCase):
+    def test_account_without_dashboard_access_gets_a_message_not_a_loop(self):
+        get_user_model().objects.create_user("student", password="Pw-12345!")  # not staff
+        response = self.client.post(reverse("login"), {"username": "student", "password": "Pw-12345!"})
+        self.assertContains(response, "doesn&#x27;t have access to STS LMS")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_old_non_staff_session_is_signed_out_at_root(self):
+        self.client.force_login(get_user_model().objects.create_user("student", password="Pw-12345!"))
+        self.assertRedirects(self.client.get("/"), reverse("login"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+
+class EscalationTests(TestCase):
+    """Someone who can manage users, but isn't a super admin, must not be able to gain more power."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.boss = User.objects.create_superuser("boss", "boss@example.com", "Pw-12345!")
+        account_perms = Permission.objects.filter(content_type__app_label="auth")
+        self.user_admin_role = Group.objects.create(name="User admin")
+        self.user_admin_role.permissions.set(account_perms)
+        self.strong_role = Group.objects.create(name="Strong")
+        self.strong_role.permissions.set(Permission.objects.filter(codename="delete_question"))
+        self.manager = User.objects.create_user("manager", "m@example.com", "Pw-12345!", is_staff=True)
+        self.manager.groups.add(self.user_admin_role)
+        self.client.force_login(self.manager)
+
+    def change_self(self, **extra):
+        data = {"username": "manager", "first_name": "", "last_name": "", "email": "m@example.com",
+                "is_active": "on", "groups": [self.user_admin_role.pk], **extra}
+        return self.client.post(reverse("admin:auth_user_change", args=[self.manager.pk]), data)
+
+    def test_cannot_make_self_super_admin(self):
+        response = self.change_self(first_name="Mia", is_superuser="on", is_staff="on")
+        self.assertEqual(response.status_code, 302)  # saved, but the super admin box was ignored
+        self.manager.refresh_from_db()
+        self.assertEqual(self.manager.first_name, "Mia")
+        self.assertFalse(self.manager.is_superuser)
+
+    def test_cannot_give_self_a_stronger_role(self):
+        response = self.change_self(groups=[self.user_admin_role.pk, self.strong_role.pk])
+        self.assertContains(response, "Select a valid choice")  # the stronger role isn't offered
+        self.assertFalse(self.manager.groups.filter(pk=self.strong_role.pk).exists())
+
+    def test_cannot_edit_or_reset_a_super_admin(self):
+        # Changing the super admin's email would let the manager reset the password and take over the account.
+        self.client.post(reverse("admin:auth_user_change", args=[self.boss.pk]),
+                         {"username": "boss", "email": "manager-owns-this@example.com", "is_active": "on"})
+        self.boss.refresh_from_db()
+        self.assertEqual(self.boss.email, "boss@example.com")
+        password_url = reverse("admin:auth_user_password_change", args=[self.boss.pk])
+        self.assertEqual(self.client.get(password_url).status_code, 403)
+
+    def test_cannot_change_what_a_role_allows(self):
+        extra = Permission.objects.get(codename="delete_question")
+        self.client.post(reverse("admin:auth_group_change", args=[self.user_admin_role.pk]),
+                         {"name": "User admin", "permissions": [extra.pk]})
+        self.assertFalse(self.user_admin_role.permissions.filter(pk=extra.pk).exists())
+
+
+@override_settings(MAKE_WEBHOOK_URL="https://hook.example.com/abc")
+class MakeEventTests(TestCase):
+    def test_events_are_sent_in_the_background_without_phone_numbers(self):
+        from notifications.make import send_event
+
+        with mock.patch("notifications.make.threading.Thread") as thread, \
+                self.captureOnCommitCallbacks(execute=True):
+            send_event("leave.approved", {"email": "x@example.com"})
+        thread.return_value.start.assert_called_once()
+
+        source = (Path(__file__).resolve().parent.parent / "notifications" / "make.py").read_text(encoding="utf-8")
+        self.assertNotIn('"phone":', source)
 
 
 class MediaTests(TestCase):

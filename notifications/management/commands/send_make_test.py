@@ -23,7 +23,7 @@ SAMPLES = {
     },
     "leave.approved": {
         "employee_id": "T-000", "name": "Sample Teacher", "email": "sample.teacher@example.com",
-        "phone": "+8801700000000", "department": "Academics", "designation": "Teacher",
+        "department": "Academics", "designation": "Teacher",
         "leave_type": "Casual", "start_date": "2026-11-01", "end_date": "2026-11-03", "working_days": 3.0,
         "approved_by": "HR Manager", "approved_at": "2026-10-28T10:05:00+06:00",
     },

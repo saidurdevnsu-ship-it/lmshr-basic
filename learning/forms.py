@@ -2,12 +2,25 @@ import logging
 from urllib.parse import urlsplit
 
 from django.conf import settings
-from django.contrib.auth.forms import PasswordResetForm
+from django import forms
+from django.contrib.auth.forms import AuthenticationForm, PasswordResetForm
 from django.template.loader import render_to_string
 
 from notifications.mail import send_email
 
 logger = logging.getLogger(__name__)
+
+
+class SignInForm(AuthenticationForm):
+    """Signs in only accounts that can use the dashboard, so others get a clear message instead of a sign-in loop."""
+
+    def confirm_login_allowed(self, user):
+        super().confirm_login_allowed(user)
+        if not user.is_staff:
+            raise forms.ValidationError(
+                "This account doesn't have access to STS LMS yet. Ask the school admin to give it access.",
+                code="no_access",
+            )
 
 
 class ResetPasswordForm(PasswordResetForm):
