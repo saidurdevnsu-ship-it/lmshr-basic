@@ -14,7 +14,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 
 from . import workflow
-from .ai import GenerationError, claude_status, generate_final_paper, generate_questions
+from .ai import GenerationError, claude_status, generate_questions, start_final_paper
 from .forms import GenerateQuestionsForm, KnowledgeSourceForm
 from .models import (
     AcademicEvent, BlueprintItem, FinalPaper, FinalQuestion, Grade, KnowledgeSource, Question, QuestionBlueprint,
@@ -353,7 +353,8 @@ class QuestionBlueprintAdmin(admin.ModelAdmin):
                     "bp": bp,
                     "can_submit": bp.status in QuestionBlueprint.EDITABLE_BY_AUTHOR
                     and (bp.assigned_to_id == user.pk or can_review(user)),
-                    "can_review_now": bp.status == QuestionBlueprint.Status.IN_REVIEW and can_review(user),
+                    "can_review_now": bp.status == QuestionBlueprint.Status.IN_REVIEW and can_review(user)
+                    and not workflow.reviews_own(bp, user),
                     "can_generate": can_manage_final(user) and bp.status == QuestionBlueprint.Status.APPROVED
                     and (final is None or final.status != FinalPaper.Status.LOCKED),
                     "final": final,
@@ -386,10 +387,9 @@ class QuestionBlueprintAdmin(admin.ModelAdmin):
             else:
                 if not can_manage_final(user) or bp.status != QuestionBlueprint.Status.APPROVED:
                     raise PermissionDenied
-                paper = generate_final_paper(bp, user)
-                self.message_user(request, f"Final paper generated with {paper.questions.count()} questions. "
-                                           "Review it, then lock it.", messages.SUCCESS)
-                return HttpResponseRedirect(reverse("admin:questionbank_finalpaper_change", args=[paper.pk]))
+                start_final_paper(bp, user)
+                msg = ("Claude is writing the final paper. It takes a few minutes; you'll get a notification "
+                       "when it's ready.")
         except (workflow.WorkflowError, GenerationError) as exc:
             self.message_user(request, str(exc), messages.ERROR)
         else:
@@ -475,8 +475,9 @@ class FinalPaperAdmin(admin.ModelAdmin):
                     workflow.lock_final(paper, request.user)
                     self.message_user(request, "Locked. This is now the final paper.", messages.SUCCESS)
                 else:
-                    paper = generate_final_paper(paper.blueprint, request.user)
-                    self.message_user(request, f"Regenerated: {paper.questions.count()} new questions.", messages.SUCCESS)
+                    start_final_paper(paper.blueprint, request.user)
+                    self.message_user(request, "Claude is writing a new set of questions. It takes a few minutes; "
+                                               "you'll get a notification when it's ready.", messages.SUCCESS)
             except (workflow.WorkflowError, GenerationError) as exc:
                 self.message_user(request, str(exc), messages.ERROR)
             return HttpResponseRedirect(reverse("admin:questionbank_finalpaper_change", args=[paper.pk]))

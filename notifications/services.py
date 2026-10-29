@@ -8,19 +8,27 @@ from .models import Notification
 
 
 def notify(users, title, *, body="", url="", kind=Notification.Kind.INFO, dedupe_key="", exclude=None):
-    """Notify one user or an iterable of users. With a dedupe_key, each user gets it at most once."""
+    """Notify one user or an iterable of users. With a dedupe_key, each user gets it at most once.
+
+    Returns the notifications created by this call (none for users who already had the dedupe_key).
+    """
     if users is None:
-        return
+        return []
     if not hasattr(users, "__iter__"):
         users = [users]
+    created = []
     for user in {u for u in users if u is not None and u.is_active and u != exclude}:
         if dedupe_key:
-            Notification.objects.get_or_create(
+            n, is_new = Notification.objects.get_or_create(
                 recipient=user, dedupe_key=dedupe_key,
                 defaults={"title": title[:200], "body": body[:300], "url": url, "kind": kind},
             )
+            if is_new:
+                created.append(n)
         else:
-            Notification.objects.create(recipient=user, title=title[:200], body=body[:300], url=url, kind=kind)
+            created.append(Notification.objects.create(recipient=user, title=title[:200], body=body[:300], url=url,
+                                                       kind=kind))
+    return created
 
 
 def users_with_perm(perm):

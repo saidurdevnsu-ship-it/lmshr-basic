@@ -1,7 +1,10 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 
 class Subject(models.Model):
@@ -266,6 +269,11 @@ class FinalPaper(models.Model):
                                   editable=False, related_name="+")
     locked_at = models.DateTimeField(null=True, blank=True, editable=False)
     controller_notes = models.TextField(blank=True)
+    # Claude writes the paper in the background; these show progress and the last failure on the page.
+    generation_started_at = models.DateTimeField(null=True, blank=True, editable=False)
+    generation_error = models.TextField(blank=True, editable=False)
+
+    GENERATION_TIMEOUT = timedelta(minutes=15)
 
     class Meta:
         ordering = ["-generated_at"]
@@ -275,6 +283,12 @@ class FinalPaper(models.Model):
 
     def __str__(self):
         return f"Final · {self.blueprint.title}"
+
+    @property
+    def is_generating(self):
+        """True while a background generation runs. After the timeout, a stuck run no longer blocks a new one."""
+        started = self.generation_started_at
+        return started is not None and timezone.now() - started < self.GENERATION_TIMEOUT
 
     @property
     def total_marks(self):

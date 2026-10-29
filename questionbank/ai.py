@@ -3,6 +3,7 @@
 import base64
 import json
 import logging
+import threading
 
 import anthropic
 from django.conf import settings
@@ -301,8 +302,15 @@ def generate_final_paper(blueprint, user):
 
     data = _ask_claude(FINAL_SYSTEM_PROMPT, messages, FINAL_SCHEMA, effort="high")
     questions = [q for q in data["questions"] if q.get("text", "").strip()]
-    if not questions:
-        raise GenerationError("Claude didn't return any questions. Please try again.")
+    # One slot per question the blueprint asks for, in blueprint order: (section, type, marks).
+    slots = [(item.section or f"Section {n}", item.question_type, item.marks_each)
+             for n, item in enumerate(items, 1) for _ in range(item.count)]
+    if len(questions) != len(slots):
+        raise GenerationError(f"Claude wrote {len(questions)} questions but the blueprint asks for {len(slots)}, "
+                              "so the paper wasn't saved. Please generate it again.")
+    # The blueprint decides sections, types and marks, so the totals always match it.
+    for q, (section, question_type, marks) in zip(questions, slots):
+        q.update(section=section, question_type=question_type, marks=marks)
 
     with transaction.atomic():
         paper, _ = FinalPaper.objects.select_for_update().get_or_create(blueprint=blueprint)
@@ -314,7 +322,7 @@ def generate_final_paper(blueprint, user):
                 paper=paper, order=n, section=q["section"].strip()[:50], question_type=q["question_type"],
                 text=q["text"].strip(), answer=q["answer"].strip(), explanation=q["explanation"].strip(),
                 options=[o.strip() for o in q["options"]] if q["question_type"] == Question.QuestionType.MCQ else [],
-                marks=max(int(q["marks"]), 0), source_reference=q["source_reference"].strip()[:255],
+                marks=q["marks"], source_reference=q["source_reference"].strip()[:255],
             )
             for n, q in enumerate(questions, 1)
         ])
@@ -322,3 +330,62 @@ def generate_final_paper(blueprint, user):
         paper.generated_by, paper.generated_at = user, timezone.now()
         paper.save()
     return paper
+
+
+def start_final_paper(blueprint, user):
+    """Have Claude write the final paper in a background thread, since it can take several minutes and a web
+    request would time out. The user gets a notification when it's done. Returns the FinalPaper."""
+    from django.db import transaction
+    from django.utils import timezone
+
+    from .models import FinalPaper
+
+    with transaction.atomic():
+        paper, _ = FinalPaper.objects.select_for_update().get_or_create(blueprint=blueprint)
+        if paper.status == FinalPaper.Status.LOCKED:
+            raise GenerationError("This final paper is locked and can't be regenerated.")
+        if paper.is_generating:
+            raise GenerationError("Claude is already writing this paper. You'll get a notification when it's ready.")
+        paper.generation_started_at, paper.generation_error = timezone.now(), ""
+        paper.save(update_fields=["generation_started_at", "generation_error"])
+    threading.Thread(target=_in_thread, args=(write_final_paper, paper.pk, user.pk), daemon=True).start()
+    return paper
+
+
+def _in_thread(func, *args):
+    from django.db import connection
+
+    try:
+        func(*args)
+    finally:
+        connection.close()  # each thread has its own database connection
+
+
+def write_final_paper(paper_pk, user_pk):
+    """The background part of start_final_paper: generate, record the outcome and notify the user."""
+    from django.contrib.auth import get_user_model
+    from django.urls import reverse
+
+    from notifications.models import Notification
+    from notifications.services import notify
+
+    from .models import FinalPaper
+
+    paper = FinalPaper.objects.select_related("blueprint").get(pk=paper_pk)
+    user = get_user_model().objects.get(pk=user_pk)
+    try:
+        generate_final_paper(paper.blueprint, user)
+        error = ""
+    except GenerationError as exc:
+        error = str(exc)
+    except Exception:
+        logger.exception("Final paper generation failed for blueprint %s", paper.blueprint_id)
+        error = "Something went wrong while writing the paper. Please try again."
+    FinalPaper.objects.filter(pk=paper_pk).update(generation_started_at=None, generation_error=error)
+    url = reverse("admin:questionbank_finalpaper_change", args=[paper_pk])
+    if error:
+        notify(user, f"Final paper not generated: {paper.blueprint.title}", body=error, url=url,
+               kind=Notification.Kind.WARNING)
+    else:
+        notify(user, f"Final paper ready: {paper.blueprint.title}", body="Review the questions, then lock the paper.",
+               url=url, kind=Notification.Kind.SUCCESS)

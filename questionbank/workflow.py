@@ -66,10 +66,17 @@ def submit(bp, user):
            url=_url(bp), kind=Notification.Kind.APPROVAL, exclude=user)
 
 
+def reviews_own(bp, user):
+    """A HOD can't review a blueprint they wrote themselves; another HOD (or the super admin) must."""
+    return bp.assigned_to_id == user.pk and not user.is_superuser
+
+
 @transaction.atomic
 def approve(bp, user, note=""):
     if bp.status != Status.IN_REVIEW:
         raise WorkflowError("Only blueprints waiting for review can be approved.")
+    if reviews_own(bp, user):
+        raise WorkflowError("You wrote this blueprint, so another HOD has to review it.")
     bp.status = Status.APPROVED
     bp.reviewed_by, bp.reviewed_at = user, timezone.now()
     if note:
@@ -87,6 +94,8 @@ def approve(bp, user, note=""):
 def return_to_author(bp, user, note):
     if bp.status != Status.IN_REVIEW:
         raise WorkflowError("Only blueprints waiting for review can be returned.")
+    if reviews_own(bp, user):
+        raise WorkflowError("You wrote this blueprint, so another HOD has to review it.")
     if not note.strip():
         raise WorkflowError("Add a comment so the teacher knows what to change.")
     bp.status = Status.RETURNED
@@ -100,6 +109,8 @@ def return_to_author(bp, user, note):
 def lock_final(paper, user):
     if paper.status == FinalPaper.Status.LOCKED:
         raise WorkflowError("This final paper is already locked.")
+    if paper.is_generating:
+        raise WorkflowError("Claude is still writing this paper. Lock it once it's ready.")
     if not paper.questions.exists():
         raise WorkflowError("Generate the paper before locking it.")
     paper.status = FinalPaper.Status.LOCKED

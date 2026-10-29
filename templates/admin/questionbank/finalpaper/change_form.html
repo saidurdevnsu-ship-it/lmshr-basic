@@ -15,14 +15,19 @@
 {% if final %}
 <section class="wf" aria-label="Final paper">
   <div class="wf-note wf-note--secure">🔒 <strong>Confidential.</strong> Only the exam controller and super admin can see this paper. Teachers and HODs see only that it's prepared.</div>
-  {% if final.status != "locked" %}
+  {% if final.is_generating %}
+  <div class="wf-note wf-note--secure">⏳ <strong>Claude is writing the questions</strong> (started {{ final.generation_started_at|timesince }} ago). You'll get a notification when they're ready; then refresh this page.</div>
+  {% elif final.status != "locked" %}
+  {% if final.generation_error %}
+  <div class="wf-note wf-note--warn"><strong>The last attempt didn't work:</strong> {{ final.generation_error }}</div>
+  {% endif %}
   <div class="wf-panel wf-panel--secure">
     <div>
       <strong>{{ final.questions.count }} questions · {{ final.total_marks }} marks</strong>
       <p>Review and edit the questions below and save. When you're satisfied, lock the paper; locking can't be undone. Not happy? Regenerate a fresh set from the blueprint.</p>
     </div>
     <div class="wf-buttons">
-      <button type="submit" form="wf-form" name="_regenerate" class="wf-btn" data-loading="Regenerating…"
+      <button type="submit" form="wf-form" name="_regenerate" class="wf-btn" data-loading="Starting…"
         onclick="return confirm('Replace all questions with a new AI-generated set? Edits you made will be lost.')">Regenerate</button>
       <button type="submit" form="wf-form" name="_lock" class="wf-btn wf-btn--primary"
         onclick="return confirm('Lock this as the final paper? It can no longer be edited or regenerated.')">Lock as final</button>
