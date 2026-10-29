@@ -1,9 +1,11 @@
 import shutil
 import tempfile
 from datetime import date
-from io import StringIO
+from io import BytesIO, StringIO
 from unittest import mock
 
+import pymupdf
+from docx import Document
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core import mail
@@ -96,6 +98,42 @@ class FinalPaperTests(BlueprintTestCase):
         paper.refresh_from_db()
         self.assertEqual(paper.generation_error, "Claude is busy")
         self.assertFalse(paper.is_generating)
+
+
+class ExportTests(BlueprintTestCase):
+    def setUp(self):
+        super().setUp()
+        reply = claude_reply(3)
+        reply["questions"][0].update(text="সালোকসংশ্লেষণ কী?", options=["ক", "খ", "গ", "ঘ"], answer="ক")
+        with mock.patch.object(ai, "_ask_claude", return_value=reply):
+            self.paper = ai.generate_final_paper(self.bp, self.controller)
+
+    def download(self, fmt, user=None, answers=False):
+        self.client.force_login(user or self.controller)
+        url = reverse("admin:questionbank_final_export", args=[self.paper.pk, fmt])
+        return self.client.get(url + ("?answers=1" if answers else ""))
+
+    def test_unlocked_paper_cannot_be_downloaded(self):
+        self.assertEqual(self.download("pdf").status_code, 302)
+
+    def test_locked_paper_downloads_as_pdf_and_word(self):
+        workflow.lock_final(self.paper, self.controller)
+        pdf = self.download("pdf")
+        self.assertEqual(pdf["Content-Type"], "application/pdf")
+        self.assertIn("science-mid-term-question-paper.pdf", pdf["Content-Disposition"])
+        text = pymupdf.open(stream=pdf.content, filetype="pdf")[0].get_text()
+        self.assertIn("Total marks: 7", text)
+        self.assertIn("Question 1?", text)
+
+        word = Document(BytesIO(self.download("docx", answers=True).content))
+        body = "\n".join(p.text for p in word.paragraphs)
+        self.assertIn("সালোকসংশ্লেষণ কী?", body)
+        self.assertIn("Answer: ক", body)
+        self.assertEqual(AuditEvent.objects.filter(action=AuditEvent.Action.FINAL_EXPORTED).count(), 2)
+
+    def test_hod_cannot_download(self):
+        workflow.lock_final(self.paper, self.controller)
+        self.assertEqual(self.download("pdf", user=self.hod).status_code, 403)
 
 
 @override_settings(MAKE_WEBHOOK_URL="", MAKE_MAILHOOK_ADDRESS="")

@@ -1,0 +1,43 @@
+<!doctype html>
+{% comment %}Rendered to PDF by questionbank/export.py (PyMuPDF Story), which supports simple HTML and CSS only.{% endcomment %}
+<html>
+<head>
+<style>
+  body { font-family: serif; font-size: 11pt; line-height: 1.4; }
+  .center { text-align: center; }
+  h1 { font-size: 16pt; margin: 0; }
+  h2 { font-size: 12pt; margin: 14pt 0 4pt; border-bottom: 1px solid #999; }
+  .title { font-size: 14pt; font-weight: bold; margin: 6pt 0 0; }
+  .meta { margin: 6pt 0 10pt; }
+  .draft { color: #b00; font-weight: bold; }
+  .instructions { margin: 0 0 8pt; }
+  .q { margin: 8pt 0 2pt; }
+  .opt { margin: 0 0 0 24pt; }
+  .answer { margin: 2pt 0 0 24pt; color: #224; }
+  .small { font-size: 9pt; color: #555; }
+</style>
+</head>
+<body>
+  <h1 class="center">{{ company_name }}</h1>
+  <p class="center">{% if bp.exam %}{{ bp.exam.title }}{% else %}Examination{% endif %}</p>
+  <p class="center title">{% if answers %}Answer key · confidential{% else %}{{ bp.title }}{% endif %}</p>
+  <p class="center">{{ bp.subject }} · {{ bp.grade }}</p>
+  <p class="center meta">Time allowed: {{ bp.duration_minutes }} minutes &#160;&#160;&#160; Total marks: {{ total_marks }}</p>
+  {% if paper.status != "locked" %}<p class="center draft">NOT LOCKED. This paper can still change.</p>{% endif %}
+
+  {% if not answers and bp.instructions %}
+  <p class="instructions"><b>Instructions:</b> {{ bp.instructions|linebreaksbr }}</p>
+  {% endif %}
+
+  {% for section in sections %}
+    {% if section.name %}<h2>{{ section.name }}</h2>{% endif %}
+    {% for q in section.questions %}
+      <p class="q"><b>{{ q.order }}.</b> {{ q.text|linebreaksbr }} <b>[{{ q.marks }}]</b></p>
+      {% for o in q.options %}<p class="opt">{% cycle "A" "B" "C" "D" "E" "F" as letter silent %}{{ letter }}. {{ o }}</p>{% endfor %}{% resetcycle letter %}
+      {% if answers %}
+      <p class="answer"><b>Answer:</b> {{ q.answer|linebreaksbr }}{% if q.explanation %}<br><i>{{ q.explanation|linebreaksbr }}</i>{% endif %}{% if q.source_reference %}<br><span class="small">Source: {{ q.source_reference }}</span>{% endif %}</p>
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+</body>
+</html>

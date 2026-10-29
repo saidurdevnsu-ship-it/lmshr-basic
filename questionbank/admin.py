@@ -1,11 +1,10 @@
 import calendar as pycalendar
 from datetime import date, timedelta
 
-from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -15,7 +14,7 @@ from django.utils.http import urlencode
 
 from audit.services import Action, record
 
-from . import workflow
+from . import export, workflow
 from .ai import GenerationError, claude_status, generate_questions, start_final_paper
 from .forms import GenerateQuestionsForm, KnowledgeSourceForm
 from .models import (
@@ -506,27 +505,41 @@ class FinalPaperAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         return [path("<int:pk>/print/", self.admin_site.admin_view(self.print_view), name="questionbank_final_print"),
+                path("<int:pk>/export/<str:fmt>/", self.admin_site.admin_view(self.export_view),
+                     name="questionbank_final_export"),
                 *super().get_urls()]
 
-    def print_view(self, request, pk):
+    def _paper_for_export(self, request, pk):
         if not can_manage_final(request.user):
             raise PermissionDenied
-        paper = get_object_or_404(FinalPaper.objects.select_related("blueprint__subject", "blueprint__grade",
-                                                                    "blueprint__exam"), pk=pk)
-        questions = list(paper.questions.all())
+        return get_object_or_404(FinalPaper.objects.select_related("blueprint__subject", "blueprint__grade",
+                                                                   "blueprint__exam"), pk=pk)
+
+    def print_view(self, request, pk):
+        paper = self._paper_for_export(request, pk)
+        answers = request.GET.get("answers") == "1"
         record(request.user, Action.FINAL_EXPORTED, paper, request=request,
-               details="Printed with answer key" if request.GET.get("answers") == "1" else "Printed question paper")
-        sections = []
-        for q in questions:
-            if not sections or sections[-1]["name"] != q.section:
-                sections.append({"name": q.section, "questions": []})
-            sections[-1]["questions"].append(q)
-        context = {
-            "paper": paper,
-            "bp": paper.blueprint,
-            "sections": sections,
-            "total_marks": sum(q.marks for q in questions),
-            "answers": request.GET.get("answers") == "1",
-            "company_name": settings.HR_COMPANY_NAME,
-        }
-        return TemplateResponse(request, "questionbank/final_print.html", context)
+               details="Printed with answer key" if answers else "Printed question paper")
+        return TemplateResponse(request, "questionbank/final_print.html", export.paper_context(paper, answers))
+
+    EXPORTS = {
+        "pdf": (export.export_pdf, "application/pdf"),
+        "docx": (export.export_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    }
+
+    def export_view(self, request, pk, fmt):
+        """Download the locked paper or its answer key as PDF or Word."""
+        paper = self._paper_for_export(request, pk)
+        if fmt not in self.EXPORTS:
+            raise Http404
+        if paper.status != FinalPaper.Status.LOCKED:
+            self.message_user(request, "Lock the paper before downloading it. Use the print preview to check it first.",
+                              messages.ERROR)
+            return HttpResponseRedirect(reverse("admin:questionbank_finalpaper_change", args=[paper.pk]))
+        answers = request.GET.get("answers") == "1"
+        build, content_type = self.EXPORTS[fmt]
+        record(request.user, Action.FINAL_EXPORTED, paper, request=request,
+               details=f"Downloaded {'answer key' if answers else 'question paper'} as {fmt.upper()}")
+        response = HttpResponse(build(paper, answers), content_type=content_type)
+        response["Content-Disposition"] = f'attachment; filename="{export.filename(paper, answers, fmt)}"'
+        return response

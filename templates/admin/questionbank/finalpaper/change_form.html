@@ -5,8 +5,14 @@
 
 {% block object-tools-items %}
   {% if final %}
-  <li><a href="{% url 'admin:questionbank_final_print' final.pk %}" target="_blank" rel="noopener">Print question paper</a></li>
-  <li><a href="{% url 'admin:questionbank_final_print' final.pk %}?answers=1" target="_blank" rel="noopener">Print answer key</a></li>
+  <li><a href="{% url 'admin:questionbank_final_print' final.pk %}" target="_blank" rel="noopener">{% if final.status == "locked" %}Print question paper{% else %}Preview paper{% endif %}</a></li>
+  <li><a href="{% url 'admin:questionbank_final_print' final.pk %}?answers=1" target="_blank" rel="noopener">{% if final.status == "locked" %}Print answer key{% else %}Preview answer key{% endif %}</a></li>
+  {% if final.status == "locked" %}
+  <li><a href="{% url 'admin:questionbank_final_export' final.pk 'pdf' %}">Paper PDF</a></li>
+  <li><a href="{% url 'admin:questionbank_final_export' final.pk 'docx' %}">Paper Word</a></li>
+  <li><a href="{% url 'admin:questionbank_final_export' final.pk 'pdf' %}?answers=1">Answer key PDF</a></li>
+  <li><a href="{% url 'admin:questionbank_final_export' final.pk 'docx' %}?answers=1">Answer key Word</a></li>
+  {% endif %}
   {% endif %}
   {{ block.super }}
 {% endblock %}
