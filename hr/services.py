@@ -9,6 +9,7 @@ from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
+from audit.services import Action, record
 from notifications.make import leave_approved_data, send_event
 from notifications.models import Notification
 from notifications.services import notify, users_with_perm
@@ -107,6 +108,7 @@ def review_leave(leave, *, approve, reviewer, note=""):
     if note:
         leave.review_note = note
     leave.save()
+    record(reviewer, Action.LEAVE_APPROVED if approve else Action.LEAVE_REJECTED, leave, details=note)
     if approve:
         for day in working_days(leave.start_date, leave.end_date):
             Attendance.objects.update_or_create(
@@ -129,6 +131,7 @@ def cancel_leave(leave, by):
     was_approved = leave.status == ReviewStatus.APPROVED
     leave.status = ReviewStatus.CANCELLED
     leave.save(update_fields=["status"])
+    record(by, Action.LEAVE_CANCELLED, leave, details="Was approved" if was_approved else "Was pending")
     if was_approved:
         Attendance.objects.filter(
             employee=leave.employee, date__range=(leave.start_date, leave.end_date), status=Attendance.Status.ON_LEAVE

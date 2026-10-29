@@ -9,6 +9,8 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
+from audit.models import AuditEvent
+
 from . import services
 from .models import Attendance, Department, Designation, Employee, LeaveRequest, LeaveType, ReviewStatus
 
@@ -91,6 +93,8 @@ class DepartmentHeadTests(HRTestCase):
         own.refresh_from_db()
         self.assertEqual(team.status, ReviewStatus.APPROVED)
         self.assertEqual(own.status, ReviewStatus.PENDING)
+        entry = AuditEvent.objects.get(action=AuditEvent.Action.LEAVE_APPROVED)
+        self.assertEqual((entry.actor, entry.target_id), (self.head_user, str(team.pk)))
 
     def test_head_does_not_see_team_bank_details(self):
         response = self.client.get(reverse("admin:hr_employee_change", args=[self.employee.pk]))

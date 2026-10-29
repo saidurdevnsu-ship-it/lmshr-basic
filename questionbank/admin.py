@@ -13,6 +13,8 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 
+from audit.services import Action, record
+
 from . import workflow
 from .ai import GenerationError, claude_status, generate_questions, start_final_paper
 from .forms import GenerateQuestionsForm, KnowledgeSourceForm
@@ -89,11 +91,13 @@ class QuestionAdmin(admin.ModelAdmin):
     @admin.action(description="Approve selected questions", permissions=["change"])
     def approve(self, request, queryset):
         updated = queryset.update(status=Question.Status.APPROVED)
+        record(request.user, Action.QUESTIONS_APPROVED, details=f"{updated} question(s)", request=request)
         self.message_user(request, f"Approved {updated} question(s).", messages.SUCCESS)
 
     @admin.action(description="Reject selected questions", permissions=["change"])
     def reject(self, request, queryset):
         updated = queryset.update(status=Question.Status.REJECTED)
+        record(request.user, Action.QUESTIONS_REJECTED, details=f"{updated} question(s)", request=request)
         self.message_user(request, f"Rejected {updated} question(s).", messages.WARNING)
 
     def get_urls(self):
@@ -116,6 +120,9 @@ class QuestionAdmin(admin.ModelAdmin):
             except GenerationError as exc:
                 form.add_error(None, str(exc))
             else:
+                record(request.user, Action.QUESTIONS_GENERATED, request=request,
+                       details=f"{len(created)} {data['question_type']} question(s), {data['subject']} / {data['grade']}"
+                               + (f", topic: {data['topic']}" if data['topic'] else ""))
                 self.message_user(
                     request,
                     f"Generated {len(created)} {data['subject']} question(s) for {data['grade']}. "
@@ -507,6 +514,8 @@ class FinalPaperAdmin(admin.ModelAdmin):
         paper = get_object_or_404(FinalPaper.objects.select_related("blueprint__subject", "blueprint__grade",
                                                                     "blueprint__exam"), pk=pk)
         questions = list(paper.questions.all())
+        record(request.user, Action.FINAL_EXPORTED, paper, request=request,
+               details="Printed with answer key" if request.GET.get("answers") == "1" else "Printed question paper")
         sections = []
         for q in questions:
             if not sections or sections[-1]["name"] != q.section:

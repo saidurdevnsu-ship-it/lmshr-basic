@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'notifications.apps.NotificationsConfig',
     'questionbank.apps.QuestionbankConfig',
     'hr.apps.HrConfig',
+    'audit.apps.AuditConfig',
 ]
 
 MIDDLEWARE = [

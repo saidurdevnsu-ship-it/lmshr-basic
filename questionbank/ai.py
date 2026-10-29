@@ -8,6 +8,8 @@ import threading
 import anthropic
 from django.conf import settings
 
+from audit.services import Action, record
+
 from .models import KnowledgeSource, Question
 
 logger = logging.getLogger(__name__)
@@ -349,6 +351,7 @@ def start_final_paper(blueprint, user):
             raise GenerationError("Claude is already writing this paper. You'll get a notification when it's ready.")
         paper.generation_started_at, paper.generation_error = timezone.now(), ""
         paper.save(update_fields=["generation_started_at", "generation_error"])
+    record(user, Action.FINAL_STARTED, paper)
     threading.Thread(target=_in_thread, args=(write_final_paper, paper.pk, user.pk), daemon=True).start()
     return paper
 
@@ -383,6 +386,7 @@ def write_final_paper(paper_pk, user_pk):
         logger.exception("Final paper generation failed for blueprint %s", paper.blueprint_id)
         error = "Something went wrong while writing the paper. Please try again."
     FinalPaper.objects.filter(pk=paper_pk).update(generation_started_at=None, generation_error=error)
+    record(user, Action.FINAL_FAILED if error else Action.FINAL_GENERATED, paper, details=error)
     url = reverse("admin:questionbank_finalpaper_change", args=[paper_pk])
     if error:
         notify(user, f"Final paper not generated: {paper.blueprint.title}", body=error, url=url,

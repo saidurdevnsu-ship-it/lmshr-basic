@@ -12,6 +12,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from audit.models import AuditEvent
 from notifications.models import Notification
 
 from . import ai, workflow
@@ -84,6 +85,8 @@ class FinalPaperTests(BlueprintTestCase):
         self.assertFalse(paper.is_generating)
         self.assertEqual(paper.questions.count(), 3)
         self.assertTrue(Notification.objects.filter(recipient=self.controller, title__startswith="Final paper ready").exists())
+        self.assertEqual(list(AuditEvent.objects.order_by("pk").values_list("action", flat=True)),
+                         [AuditEvent.Action.FINAL_STARTED, AuditEvent.Action.FINAL_GENERATED])
 
     def test_failed_background_generation_is_shown(self):
         with mock.patch.object(ai.threading, "Thread"):

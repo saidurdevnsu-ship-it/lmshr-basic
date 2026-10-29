@@ -8,6 +8,7 @@ from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
+from audit.services import Action, record
 from notifications.models import Notification
 from notifications.services import notify, users_with_perm
 
@@ -61,6 +62,7 @@ def submit(bp, user):
     bp.status = Status.IN_REVIEW
     bp.submitted_at = timezone.now()
     bp.save()
+    record(user, Action.BLUEPRINT_SUBMITTED, bp)
     notify(users_with_perm("questionbank.review_blueprint"), f"Blueprint to review: {bp.title}",
            body=f"From {_name(user)} · {bp.total_questions} questions · {bp.total_marks} marks.",
            url=_url(bp), kind=Notification.Kind.APPROVAL, exclude=user)
@@ -82,6 +84,7 @@ def approve(bp, user, note=""):
     if note:
         bp.review_note = note
     bp.save()
+    record(user, Action.BLUEPRINT_APPROVED, bp, details=note)
     notify(bp.assigned_to, f"Blueprint approved: {bp.title}",
            body="It's with the exam controller, who will prepare the final paper.",
            url=_url(bp), kind=Notification.Kind.SUCCESS, exclude=user)
@@ -101,6 +104,7 @@ def return_to_author(bp, user, note):
     bp.status = Status.RETURNED
     bp.reviewed_by, bp.reviewed_at, bp.review_note = user, timezone.now(), note
     bp.save()
+    record(user, Action.BLUEPRINT_RETURNED, bp, details=note)
     notify(bp.assigned_to, f"Changes requested: {bp.title}", body=note,
            url=_url(bp), kind=Notification.Kind.WARNING, exclude=user)
 
@@ -116,6 +120,7 @@ def lock_final(paper, user):
     paper.status = FinalPaper.Status.LOCKED
     paper.locked_by, paper.locked_at = user, timezone.now()
     paper.save()
+    record(user, Action.FINAL_LOCKED, paper)
     bp = paper.blueprint
     bp.status = Status.FINALIZED
     bp.save(update_fields=["status", "updated_at"])
