@@ -14,6 +14,7 @@ from notifications.models import Notification
 from notifications.services import notify, users_with_perm
 
 from .models import FinalPaper, QuestionBlueprint
+from .scope import covers
 
 Status = QuestionBlueprint.Status
 FINAL_PERM = "questionbank.manage_final_papers"
@@ -64,7 +65,8 @@ def submit(bp, user):
     bp.submitted_at = timezone.now()
     bp.save()
     record(user, Action.BLUEPRINT_SUBMITTED, bp)
-    notify(users_with_perm("questionbank.review_blueprint"), f"Blueprint to review: {bp.title}",
+    reviewers = [u for u in users_with_perm("questionbank.review_blueprint") if covers(u, bp.subject, bp.grade)]
+    notify(reviewers, f"Blueprint to review: {bp.title}",
            body=f"From {_name(user)} · {bp.total_questions} questions · {bp.total_marks} marks.",
            url=_url(bp), kind=Notification.Kind.APPROVAL, exclude=user)
 

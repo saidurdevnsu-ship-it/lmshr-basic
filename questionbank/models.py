@@ -31,6 +31,28 @@ class Grade(models.Model):
         return self.name
 
 
+class SubjectAssignment(models.Model):
+    """A subject (optionally one grade of it) a teacher, HOD or read-only user works on. People see and act on
+    question bank material only for their assignments; super admins and exam controllers see every subject."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subject_assignments")
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="assignments")
+    grade = models.ForeignKey(Grade, on_delete=models.CASCADE, null=True, blank=True, related_name="assignments",
+                              help_text="Leave blank for every grade of the subject.")
+
+    class Meta:
+        ordering = ["user__username", "subject", "grade"]
+        verbose_name = "subject assignment"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "subject", "grade"], name="one_assignment_per_grade"),
+            models.UniqueConstraint(fields=["user", "subject"], condition=models.Q(grade__isnull=True),
+                                    name="one_all_grades_assignment"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} · {self.subject} · {self.grade or 'all grades'}"
+
+
 class KnowledgeSource(models.Model):
     """A textbook, syllabus, lesson plan or other file that Claude reads when generating questions for a subject and
     grade."""

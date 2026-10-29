@@ -16,11 +16,12 @@ from audit.services import Action, record
 from learning.approvals import SELF_APPROVAL_MESSAGE, is_own, others_only
 
 from . import export, workflow
+from .scope import allowed_subjects, covers, has_no_assignments, in_scope
 from .ai import GenerationError, claude_status, generate_questions, start_final_paper
 from .forms import BlueprintForm, GenerateQuestionsForm, KnowledgeSourceForm
 from .models import (
     AcademicEvent, BlueprintItem, FinalPaper, FinalQuestion, Grade, KnowledgeSource, Question, QuestionBlueprint,
-    Subject,
+    Subject, SubjectAssignment,
 )
 from .workflow import can_manage_final, can_review
 
@@ -37,8 +38,69 @@ class GradeAdmin(admin.ModelAdmin):
     list_editable = ("order",)
 
 
+class SubjectScopeMixin:
+    """Limit a subject-and-grade model to the user's subject assignments: the list, the subject choices, and the
+    subject/grade a form may save."""
+
+    scope_list = True
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return in_scope(qs, request.user) if self.scope_list else qs
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "subject":
+            kwargs["queryset"] = allowed_subjects(request.user)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        user = request.user
+
+        class ScopedForm(form):
+            def clean(self):
+                cleaned = super().clean()
+                subject, grade = cleaned.get("subject"), cleaned.get("grade")
+                if subject and grade and not covers(user, subject, grade):
+                    self.add_error("grade", f"You aren't assigned to {subject} for {grade}.")
+                return cleaned
+
+        return ScopedForm
+
+    def changelist_view(self, request, extra_context=None):
+        if has_no_assignments(request.user):
+            self.message_user(request, "You aren't assigned to any subjects yet, so there's nothing to show. Ask the "
+                                       "super admin to add your subjects under Subject assignments.", messages.WARNING)
+        return super().changelist_view(request, extra_context)
+
+
+@admin.register(SubjectAssignment)
+class SubjectAssignmentAdmin(admin.ModelAdmin):
+    """Who works on which subjects. Only super admins manage this, so nobody can widen their own access."""
+
+    list_display = ("user", "subject", "grade")
+    list_filter = ("subject", "grade")
+    search_fields = ("user__username", "user__first_name", "user__last_name", "subject__name")
+    autocomplete_fields = ("user",)
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
 @admin.register(KnowledgeSource)
-class KnowledgeSourceAdmin(admin.ModelAdmin):
+class KnowledgeSourceAdmin(SubjectScopeMixin, admin.ModelAdmin):
     form = KnowledgeSourceForm
     list_display = ("title", "material_type", "subject", "grade", "chapter", "words", "is_active", "uploaded_by",
                     "created_at")
@@ -78,7 +140,7 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
 
 
 @admin.register(Question)
-class QuestionAdmin(admin.ModelAdmin):
+class QuestionAdmin(SubjectScopeMixin, admin.ModelAdmin):
     change_list_template = "admin/questionbank/question/change_list.html"
     list_display = ("__str__", "subject", "grade", "question_type", "difficulty", "status", "ai_generated",
                     "duplicate_flag")
@@ -159,7 +221,7 @@ class QuestionAdmin(admin.ModelAdmin):
 
         # Links from a question paper pre-fill its subject and grade (?subject=1&grade=2).
         initial = {k: request.GET[k] for k in ("subject", "grade", "topic") if request.GET.get(k)}
-        form = GenerateQuestionsForm(request.POST or None, initial=initial)
+        form = GenerateQuestionsForm(request.POST or None, initial=initial, user=request.user)
         if request.method == "POST" and form.is_valid():
             data = form.cleaned_data
             try:
@@ -191,16 +253,17 @@ class QuestionAdmin(admin.ModelAdmin):
             "opts": self.model._meta,
             "title": "Generate questions with AI",
             "form": form,
-            "sources_by_pair": self._source_counts(),
+            "sources_by_pair": self._source_counts(request.user),
             "can_add_source": request.user.has_perm("questionbank.add_knowledgesource"),
             "claude": claude_status(),
         }
         return TemplateResponse(request, "admin/questionbank/question/generate.html", context)
 
     @staticmethod
-    def _source_counts():
+    def _source_counts(user):
         counts = {}
-        for subject_id, grade_id in KnowledgeSource.objects.filter(is_active=True).values_list("subject_id", "grade_id"):
+        active = in_scope(KnowledgeSource.objects.filter(is_active=True), user)
+        for subject_id, grade_id in active.values_list("subject_id", "grade_id"):
             key = f"{subject_id}:{grade_id}"
             counts[key] = counts.get(key, 0) + 1
         return counts
@@ -313,7 +376,8 @@ class BlueprintItemInline(admin.TabularInline):
 
 
 @admin.register(QuestionBlueprint)
-class QuestionBlueprintAdmin(admin.ModelAdmin):
+class QuestionBlueprintAdmin(SubjectScopeMixin, admin.ModelAdmin):
+    scope_list = False  # get_queryset below decides who sees which blueprints
     change_form_template = "admin/questionbank/questionblueprint/change_form.html"
     form = BlueprintForm
     list_display = ("title", "subject", "grade", "assigned_to", "due_display", "marks_display", "status_badge")
@@ -335,9 +399,12 @@ class QuestionBlueprintAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         user = request.user
-        if user.is_superuser or can_review(user):
+        if user.is_superuser:
             return qs
         visible = Q(assigned_to=user) | Q(created_by=user)
+        if can_review(user):
+            # HODs review the blueprints of the subjects they're assigned to.
+            visible |= Q(pk__in=in_scope(qs, user).values("pk"))
         if can_manage_final(user):
             visible |= Q(status__in=[QuestionBlueprint.Status.APPROVED, QuestionBlueprint.Status.FINALIZED])
         return qs.filter(visible)

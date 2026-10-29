@@ -2,6 +2,7 @@ from django import forms
 
 from .ai import LANGUAGES
 from .documents import UnreadableDocument, extract_text
+from .scope import allowed_subjects, covers, in_scope
 from .models import Grade, KnowledgeSource, Question, QuestionBlueprint, Subject
 
 
@@ -29,6 +30,8 @@ def check_materials(materials, subject, grade):
 
 
 class GenerateQuestionsForm(forms.Form):
+    """Pass user= to limit subjects and materials to the user's subject assignments."""
+
     subject = forms.ModelChoiceField(queryset=Subject.objects.all(), empty_label="Select a subject")
     grade = forms.ModelChoiceField(queryset=Grade.objects.all(), empty_label="Select a grade")
     topic = forms.CharField(
@@ -48,9 +51,18 @@ class GenerateQuestionsForm(forms.Form):
     count = forms.IntegerField(label="How many", min_value=1, max_value=30, initial=10)
     language = forms.ChoiceField(choices=LANGUAGES.items(), initial="en")
 
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        if user is not None:
+            self.fields["subject"].queryset = allowed_subjects(user)
+            self.fields["sources"].queryset = in_scope(self.fields["sources"].queryset, user)
+
     def clean(self):
         cleaned = super().clean()
         subject, grade = cleaned.get("subject"), cleaned.get("grade")
+        if subject and grade and self.user is not None and not covers(self.user, subject, grade):
+            raise forms.ValidationError(f"You aren't assigned to {subject} for {grade}.")
         if subject and grade and cleaned.get("sources"):
             check_materials(cleaned["sources"], subject, grade)
         if subject and grade and not KnowledgeSource.objects.filter(

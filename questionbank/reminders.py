@@ -9,7 +9,7 @@ from notifications.models import Notification
 from notifications.services import notify
 
 from .models import AcademicEvent, Question, QuestionBlueprint
-from .workflow import can_review
+from .scope import allowed_subjects, covers
 
 # Remind 7, 3 and 1 day(s) before a deadline, then once when it's overdue.
 BUCKETS = ((1, "1d"), (3, "3d"), (7, "7d"))
@@ -35,11 +35,13 @@ def _when(days_left):
 
 
 def _works_on(user, event):
-    """Whether a question deadline concerns this user: events without a subject concern everyone; otherwise HODs
-    and the people who write blueprints or questions for that subject."""
-    if event.subject_id is None or can_review(user):
+    """Whether a question deadline concerns this user: events without a subject concern everyone; otherwise the
+    people assigned to that subject (and grade), and anyone writing blueprints or questions for it."""
+    if event.subject_id is None:
         return True
-    return (QuestionBlueprint.objects.filter(assigned_to=user, subject_id=event.subject_id).exists()
+    assigned = (covers(user, event.subject, event.grade) if event.grade_id
+                else allowed_subjects(user).filter(pk=event.subject_id).exists())
+    return (assigned or QuestionBlueprint.objects.filter(assigned_to=user, subject_id=event.subject_id).exists()
             or Question.objects.filter(created_by=user, subject_id=event.subject_id).exists())
 
 

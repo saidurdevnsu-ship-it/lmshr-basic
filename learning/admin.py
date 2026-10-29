@@ -5,6 +5,7 @@ from django.contrib.auth.forms import AdminUserCreationForm
 from django.contrib.auth.models import Group, User
 
 from notifications.make import send_event, user_created_data
+from questionbank.models import SubjectAssignment
 
 from .welcome import send_welcome_email
 
@@ -71,6 +72,26 @@ class RoleAdmin(BaseGroupAdmin):
         return request.user.is_superuser
 
 
+class SubjectAssignmentInline(admin.TabularInline):
+    """The subjects (and grades) this person works on in the question bank. Super admins only."""
+
+    model = SubjectAssignment
+    extra = 0
+    verbose_name_plural = "Subjects taught or reviewed (question bank access)"
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """Django's user admin, with "groups" presented as roles and no way to gain more permissions than you hold."""
@@ -87,6 +108,10 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
     actions = ("resend_welcome",)
+    inlines = (SubjectAssignmentInline,)
+
+    def get_inlines(self, request, obj):
+        return self.inlines if obj is not None else ()  # subjects are added once the account exists
 
     def has_change_permission(self, request, obj=None):
         return super().has_change_permission(request, obj) and (obj is None or can_manage_account(request.user, obj))

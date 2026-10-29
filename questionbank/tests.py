@@ -21,6 +21,7 @@ from . import ai, workflow
 from .forms import GenerateQuestionsForm
 from .models import (
     AcademicEvent, BlueprintItem, FinalPaper, Grade, KnowledgeSource, Question, QuestionBlueprint, Subject,
+    SubjectAssignment,
 )
 from .reminders import ensure_reminders
 
@@ -297,6 +298,8 @@ class RoleTests(BlueprintTestCase):
         self.teacher.groups.add(Group.objects.get(name="Teacher / Subject Expert"))
         self.viewer = User.objects.create_user("viewer", password="Pw-12345!", is_staff=True)
         self.viewer.groups.add(Group.objects.get(name="Read-Only"))
+        for user in (self.teacher, self.viewer):
+            SubjectAssignment.objects.create(user=user, subject=self.bp.subject)
         self.book = KnowledgeSource.objects.get()  # uploaded by nobody in particular
 
     def upload(self):
@@ -340,6 +343,95 @@ class ReviewTests(BlueprintTestCase):
             workflow.approve(self.bp, self.controller)
 
 
+class SubjectScopeTests(BlueprintTestCase):
+    """A Physics teacher or HOD must not see or act on Science work."""
+
+    def setUp(self):
+        super().setUp()
+        call_command("setup_academics", stdout=StringIO())
+        User = get_user_model()
+        self.physics = Subject.objects.create(name="Physics")
+        self.science, self.class8 = self.bp.subject, self.bp.grade
+        self.class9 = Grade.objects.create(name="Class 9")
+
+        def person(name, role, *assignments):
+            user = User.objects.create_user(name, password="Pw-12345!", is_staff=True)
+            user.groups.add(Group.objects.get(name=role))
+            for subject, grade in assignments:
+                SubjectAssignment.objects.create(user=user, subject=subject, grade=grade)
+            return user
+
+        self.physics_teacher = person("phy-teacher", "Teacher / Subject Expert", (self.physics, None))
+        self.physics_hod = person("phy-hod", "Head of Department", (self.physics, None))
+        self.science_hod = person("sci-hod", "Head of Department", (self.science, self.class8))
+        self.unassigned = person("new-teacher", "Teacher / Subject Expert")
+        q = lambda subject, grade, text: Question.objects.create(subject=subject, grade=grade, question_type="short",
+                                                                 text=text, answer="A", created_by=self.controller)
+        self.science_q = q(self.science, self.class8, "Science class 8 question")
+        self.science9_q = q(self.science, self.class9, "Science class 9 question")
+        self.physics_q = q(self.physics, self.class8, "Physics question")
+
+    def question_list(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse("admin:questionbank_question_changelist"))
+
+    def test_teacher_sees_only_own_subject(self):
+        response = self.question_list(self.physics_teacher)
+        self.assertContains(response, "Physics question")
+        self.assertNotContains(response, "Science class 8 question")
+        url = reverse("admin:questionbank_question_change", args=[self.science_q.pk])
+        self.assertEqual(self.client.get(url).status_code, 302)  # "doesn't exist" for them
+
+    def test_grade_specific_assignment(self):
+        response = self.question_list(self.science_hod)
+        self.assertContains(response, "Science class 8 question")
+        self.assertNotContains(response, "Science class 9 question")
+
+    def test_hod_cannot_approve_another_subjects_questions(self):
+        self.client.force_login(self.physics_hod)
+        self.client.post(reverse("admin:questionbank_question_changelist"),
+                         {"action": "approve", "_selected_action": [self.science_q.pk, self.physics_q.pk]})
+        self.science_q.refresh_from_db()
+        self.physics_q.refresh_from_db()
+        self.assertEqual(self.science_q.status, Question.Status.DRAFT)
+        self.assertEqual(self.physics_q.status, Question.Status.APPROVED)
+
+    def test_teacher_cannot_add_material_for_another_subject(self):
+        self.client.force_login(self.physics_teacher)
+        self.client.post(reverse("admin:questionbank_knowledgesource_add"), {
+            "subject": self.science.pk, "grade": self.class8.pk, "material_type": "textbook", "title": "Sneaky",
+            "chapter": "", "topic": "", "is_active": "on", "file": SimpleUploadedFile("s.txt", b"x")})
+        self.assertFalse(KnowledgeSource.objects.filter(title="Sneaky").exists())
+
+    def test_generate_form_offers_only_assigned_subjects(self):
+        form = GenerateQuestionsForm(user=self.physics_teacher)
+        self.assertEqual(list(form.fields["subject"].queryset), [self.physics])
+
+    def test_hods_see_and_are_notified_about_their_subjects_blueprints_only(self):
+        self.bp.status, self.bp.assigned_to = QuestionBlueprint.Status.DRAFT, self.controller
+        self.bp.save()
+        workflow.submit(self.bp, self.controller)
+        self.assertTrue(Notification.objects.filter(recipient=self.science_hod, title__contains="to review").exists())
+        self.assertFalse(Notification.objects.filter(recipient=self.physics_hod, title__contains="to review").exists())
+        self.client.force_login(self.physics_hod)
+        url = reverse("admin:questionbank_questionblueprint_change", args=[self.bp.pk])
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_no_assignment_means_nothing_and_a_message(self):
+        response = self.question_list(self.unassigned)
+        self.assertContains(response, "aren&#x27;t assigned to any subjects")
+        self.assertNotContains(response, "Physics question")
+
+    def test_exam_controller_and_super_admin_see_every_subject(self):
+        response = self.question_list(self.controller)
+        for text in ("Physics question", "Science class 8 question", "Science class 9 question"):
+            self.assertContains(response, text)
+
+    def test_only_super_admins_manage_assignments(self):
+        self.client.force_login(self.science_hod)
+        self.assertEqual(self.client.get(reverse("admin:questionbank_subjectassignment_add")).status_code, 403)
+
+
 class QuestionApprovalTests(BlueprintTestCase):
     def setUp(self):
         super().setUp()
@@ -349,6 +441,8 @@ class QuestionApprovalTests(BlueprintTestCase):
         self.teacher.groups.add(Group.objects.get(name="Teacher / Subject Expert"))
         self.head = User.objects.create_user("head", password="Pw-12345!", is_staff=True)
         self.head.groups.add(Group.objects.get(name="Head of Department"))
+        for user in (self.teacher, self.head):
+            SubjectAssignment.objects.create(user=user, subject=self.bp.subject)
         make = lambda by, text: Question.objects.create(subject=self.bp.subject, grade=self.bp.grade,
                                                         question_type="short", text=text, answer="A", created_by=by)
         self.teachers_q, self.heads_q = make(self.teacher, "Teacher's question"), make(self.head, "HOD's question")
